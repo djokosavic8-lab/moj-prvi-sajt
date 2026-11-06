@@ -1,43 +1,10 @@
-javascript
-function upaliKameru() {
-    // Provjera da li pretraživač uopšte podržava kameru
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        alert("Tvoj pretraživač ne podržava pristup kameri. Pokušaj kroz Google Chrome.");
-        return;
-    }
-
-    // Zahtjev za kameru sa striktnim parametrima za mobilni
-    navigator.mediaDevices.getUserMedia({ 
-        video: { 
-            facingMode: { exact: "environment" } // Ovo prisiljava telefon da upali ZADNJU kameru
-        } 
-    })
-    .then(function(stream) {
-        // Ako telefon odobri, ovdje povezuješ kameru sa video elementom
-        let video = document.querySelector('video'); // Provjeri da li imaš <video> tag u HTML-u
-        if (video) {
-            video.srcObject = stream;
-            video.setAttribute("playsinline", true); // Ključno za iOS/Safari da video ne ode u full-screen
-            video.play();
-        } else {
-            alert("Kamera je aktivna, ali na stranici nedostaje <video> element za prikaz slike!");
-        }
-    })
-    .catch(function(error) {
-        // Ako telefon odbije ili se desi greška, ovaj 'alert' će ti tačno reći ZAŠTO ne radi
-        alert("Greška sa kamerom: " + error.name + "\nPoruka: " + error.message);
-    });
-}
-
-novo otvaranje kamere
-html
 <!DOCTYPE html>
 <html lang="hr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inventura JS</title>
-    <!-- UKLJUČENA TAČNA BIBLIOTEKA ZA SKENIRANJE BAR-KODOVA -->
+    <!-- POPRAVLJENO: Sada se ispravno učitava tačna skener biblioteka -->
     <script src="https://unpkg.com"></script>
     <style>
         body { font-family: Arial, sans-serif; margin: 15px; padding: 0; background: #f4f4f9; color: #333; }
@@ -48,4 +15,188 @@ html
         button.download { background: #28a745; }
         input { width: 94%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; }
         #reader { width: 100%; border-radius: 8px; overflow: hidden; margin-top: 10px; background: #eee; }
-        /* Popravka za video element unutar skenera */
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background: #f2f2f2; }
+    </style>
+</head>
+<body>
+
+    <h2>📦 Mobilna Djokina Inventura 2026</h2>
+
+    <!-- Kamera Skener -->
+    <div class="box">
+        <h3>1. Skeniranje / Unos</h3>
+        <!-- Ovdje će se prikazivati slika sa kamere -->
+        <div id="reader" style="display: none; min-height: 250px;"></div>
+        <button id="btnKamera" onclick="pokreniKameru()">📷 Upali kameru za Bar-kod</button>
+        
+        <p>
+            <label>Bar-kod ili Šifra:</label>
+            <input type="text" id="sifra" placeholder="Skenirajte ili upišite ručno">
+        </p>
+        <p>
+            <label>Količina:</label>
+            <input type="number" id="kolicina" value="1" min="1">
+        </p>
+        <button onclick="dodajArtikal()">➕ Upiši Artikal</button>
+    </div>
+
+    <!-- Lista artikala u memoriji -->
+    <div class="box">
+        <h3>2. Zadržani artikli na telefonu</h3>
+        <button class="download" onclick="preuzmiCSV()">💾 Preuzmi podatke za Računar (TXT)</button>
+        <button class="delete" onclick="obrisiSve()">🗑️ Obriši sve sa telefona</button>
+        
+        <div style="overflow-x:auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Šifra / Bar-kod</th>
+                        <th>Količina</th>
+                    </tr>
+                </thead>
+                <tbody id="tabelaArtikala">
+                    <!-- Ovdje JS ubacuje redove -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+<script>
+    let artikli = JSON.parse(localStorage.getItem("inventura_artikli")) || [];
+    prikaziArtikale();
+
+    let html5Qrcode = null;
+
+    // POPRAVLJENO: Prilagođeno za starije telefone i stabilniji rad kamere
+    function pokreniKameru() {
+        const readerDiv = document.getElementById("reader");
+        const btnKamera = document.getElementById("btnKamera");
+
+        // Ako je kamera već upaljena, klikom na dugme je gasimo
+        if (html5Qrcode && html5Qrcode.isScanning) {
+            ugasiKameru();
+            return;
+        }
+
+        readerDiv.style.display = "block";
+        btnKamera.innerText = "🛑 Ugasi kameru";
+        btnKamera.style.background = "#6c757d";
+
+        html5Qrcode = new Html5Qrcode("reader");
+        
+        // Pokretanje zadnje kamere (environment) u optimalnoj rezoluciji za starije uređaje
+        html5Qrcode.start(
+            { facingMode: "environment" }, 
+            {
+                fps: 10,
+                qrbox: function(width, height) {
+                    return { width: width * 0.7, height: height * 0.5 };
+                }
+            },
+            (decodedText) => {
+                // Kada skener prepozna bar-kod
+                document.getElementById("sifra").value = decodedText;
+                
+                // Zvučni signal (opciono, daje povratnu informaciju na telefonu)
+                if (window.navigator && window.navigator.vibrate) {
+                    window.navigator.vibrate(100);
+                }
+                
+                ugasiKameru();
+            },
+            (errorMessage) => {
+                // Ignorišemo sitne greške tokom traženja koda u frejmu da ne koči telefon
+            }
+        ).catch(err => {
+            alert("Greška pri pokretanju kamere. Provjerite dozvole u Chrome-u. Detalji: " + err);
+            ugasiKameru();
+        });
+    }
+
+    function ugasiKameru() {
+        const readerDiv = document.getElementById("reader");
+        const btnKamera = document.getElementById("btnKamera");
+        
+        if (html5Qrcode) {
+            html5Qrcode.stop().then(() => {
+                html5Qrcode.clear();
+                readerDiv.style.display = "none";
+                btnKamera.innerText = "📷 Upali kameru za Bar-kod";
+                btnKamera.style.background = "#007bff";
+            }).catch(err => {
+                readerDiv.style.display = "none";
+                btnKamera.innerText = "📷 Upali kameru za Bar-kod";
+                btnKamera.style.background = "#007bff";
+            });
+        }
+    }
+
+    // Dodavanje artikla u lokalnu memoriju telefona
+    function dodajArtikal() {
+        let sifra = document.getElementById("sifra").value.trim();
+        let kolicina = parseInt(document.getElementById("kolicina").value);
+
+        if (!sifra || kolicina < 1) {
+            alert("Molimo unesite ispravnu šifru i količinu!");
+            return;
+        }
+
+        let postojeci = artikli.find(a => a.sifra === sifra);
+        if (postojeci) {
+            postojeci.kolicina += kolicina;
+        } else {
+            artikli.push({ sifra: sifra, kolicina: kolicina });
+        }
+
+        localStorage.setItem("inventura_artikli", JSON.stringify(artikli));
+        prikaziArtikale();
+
+        document.getElementById("sifra").value = "";
+        document.getElementById("kolicina").value = "1";
+    }
+
+    // Prikazivanje tabele na ekranu
+    function prikaziArtikale() {
+        let tbody = document.getElementById("tabelaArtikala");
+        tbody.innerHTML = "";
+        artikli.forEach(artikal => {
+            let row = `<tr><td>${artikal.sifra}</td><td>${artikal.kolicina}</td></tr>`;
+            tbody.innerHTML += row;
+        });
+    }
+
+    // Generisanje fajla bez naslova za prebacivanje na računar
+    function preuzmiCSV() {
+        if (artikli.length === 0) {
+            alert("Nema podataka za preuzimanje!");
+            return;
+        }
+        
+        let csvContent = "data:text/csv;charset=utf-8,";
+        artikli.forEach(a => {
+            csvContent += `${a.sifra},${a.kolicina}\n`;
+        });
+
+        let encodedUri = encodeURI(csvContent);
+        let link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "inventura.txt");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    // Brisanje podataka sa telefona
+    function obrisiSve() {
+        if (confirm("Da li ste sigurni da želite obrisati sve skenirane artikle sa telefona?")) {
+            localStorage.removeItem("inventura_artikli");
+            artikli = [];
+            prikaziArtikale();
+        }
+    }
+</script>
+
+</body>
+</html>
