@@ -5,8 +5,8 @@ html
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inventura JS</title>
-    <!-- Učitan provjeren i stabilan link za html5-qrcode biblioteku -->
-    <script src="https://cloudflare.com"></script>
+    <!-- POPRAVLJENO: Učitan ispravan i stabilan link za html5-qrcode biblioteku -->
+    <script src="https://unpkg.com" type="text/javascript"></script>
     <style>
         body { font-family: Arial, sans-serif; margin: 15px; padding: 0; background: #f4f4f9; color: #333; }
         h2 { text-align: center; }
@@ -19,7 +19,6 @@ html
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
         th { background: #f2f2f2; }
-        /* Vizuelno obavještenje za uspješno automatsko skeniranje */
         .flash-success { animation: flash 0.3s ease-out; }
         @keyframes flash {
             0% { background: #28a745; }
@@ -34,7 +33,6 @@ html
     <!-- Kamera Skener -->
     <div class="box" id="unosBox">
         <h3>1. Skeniranje / Unos</h3>
-        <!-- Ovdje se prikazuje video stream sa kamere -->
         <div id="reader" style="display: none; min-height: 250px;"></div>
         <button id="btnKamera" onclick="pokreniKameru()">📷 Upali kameru za Bar-kod</button>
         
@@ -46,7 +44,6 @@ html
             <label>Količina:</label>
             <input type="number" id="kolicina" value="1" min="1">
         </p>
-        <!-- POPRAVLJENO: Dodat parametar 'event' kako bismo blokirali refresh stranice -->
         <button type="button" onclick="dodajArtikal(event)">➕ Upiši Artikal</button>
     </div>
 
@@ -73,6 +70,8 @@ html
 
 <script>
     let artikli = JSON.parse(localStorage.getItem("inventura_artikli")) || [];
+    
+    // Pokrećemo prikaz artikala odmah na startu
     prikaziArtikale();
 
     let html5Qrcode = null;
@@ -112,7 +111,6 @@ html
             (decodedText) => {
                 let sada = Date.now();
                 
-                // Zaštita da ne skenira isti kod više puta u sekundi ako ruku držiš mirno
                 if (decodedText === zadnjiSkeniraniKod && (sada - zadnjeVrijemeSkeniranja < 1500)) {
                     return; 
                 }
@@ -126,14 +124,13 @@ html
                     window.navigator.vibrate(100);
                 }
                 
-                // AUTOMATSKI UPIS: Odmah dodaj artikal i nastavi skenirati
                 dodajArtikalAutomatski(decodedText);
             },
             (errorMessage) => {
-                // Ignorišemo frejmove koji nemaju kod
+                // Ignorišemo frejmove bez koda
             }
         ).catch(err => {
-            alert("Greška sa kamerom! Detalji: " + err);
+            alert("Greška sa kamerom! Provjerite dozvole (Permissions) u pretraživaču. Detalji: " + err);
             ugasiKameru();
         });
     }
@@ -161,7 +158,6 @@ html
         }
     }
 
-    // Funkcija koja obavlja automatski upis prilikom kontinualnog skeniranja kamerom
     function dodajArtikalAutomatski(sifraKoda) {
         let sifra = sifraKoda.trim();
         let kolicina = parseInt(document.getElementById("kolicina").value) || 1;
@@ -179,16 +175,13 @@ html
         document.getElementById("sifra").value = "";
         document.getElementById("kolicina").value = "1";
 
-        // Efekat zelenog bljeska na ekranu kao potvrda da je artikal upisan
         const unosBox = document.getElementById("unosBox");
         unosBox.classList.remove("flash-success");
-        void unosBox.offsetWidth; // Restart CSS animacije
+        void unosBox.offsetWidth; 
         unosBox.classList.add("flash-success");
     }
 
-    // Standardna funkcija za ručni upis preko dugmeta "Upiši Artikal"
     function dodajArtikal(e) {
-        // POPRAVLJENO: Sprečavamo da dugme osvježi/refreshuje stranicu i ugasi kameru
         if (e) {
             e.preventDefault();
         }
@@ -196,7 +189,6 @@ html
         let sifra = document.getElementById("sifra").value.trim();
         let kolicina = parseInt(document.getElementById("kolicina").value);
 
-        // Ako je polje prazno, a kamera radi, ne radimo ništa jer kamera sama obavlja upis u pozadini
         if (!sifra && html5Qrcode && html5Qrcode.isScanning) {
             return;
         }
@@ -218,50 +210,49 @@ html
 
         document.getElementById("sifra").value = "";
         document.getElementById("kolicina").value = "1";
-        zadnjiSkeniraniKod = ""; // Dozvoli ponovno skeniranje istog koda
     }
 
+    // DODANO: Funkcija za prikaz artikala u tabeli
     function prikaziArtikale() {
-        let tbody = document.getElementById("tabelaArtikala");
-        tbody.innerHTML = "";
-        let obrnutiArtikli = [...artikli].reverse();
-        obrnutiArtikli.forEach(artikal => {
-            let row = `<tr><td>${artikal.sifra}</td><td>${artikal.kolicina}</td></tr>`;
-            tbody.innerHTML += row;
+        const tabela = document.getElementById("tabelaArtikala");
+        tabela.innerHTML = "";
+        
+        artikli.forEach(artikal => {
+            let red = `<tr>
+                <td>${artikal.sifra}</td>
+                <td>${artikal.kolicina}</td>
+            </tr>`;
+            tabela.innerHTML += red;
         });
     }
 
-    function preuzmiCSV() {
-        if (artikli.length === 0) {
-            alert("Nema podataka za preuzimanje!");
-            return;
-        }
-        
-        let csvContent = "";
-        artikli.forEach(a => {
-            csvContent += `${a.sifra},${a.kolicina}\n`;
-        });
-
-        let blob = new Blob([csvContent], { type: "text/plain;charset=utf-8;" });
-        let link = document.createElement("a");
-        let url = URL.createObjectURL(blob);
-        
-        link.setAttribute("href", url);
-        link.setAttribute("download", "inventura.txt");
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    }
-
+    // DODANO: Funkcija za brisanje svih artikala sa telefona
     function obrisiSve() {
         if (confirm("Da li ste sigurni da želite obrisati sve skenirane artikle sa telefona?")) {
-            localStorage.removeItem("inventura_artikli");
             artikli = [];
+            localStorage.removeItem("inventura_artikli");
             prikaziArtikale();
-            zadnjiSkeniraniKod = "";
         }
     }
-</script>
 
+    // DODANO: Funkcija za preuzimanje CSV/TXT fajla na računar
+    function preuzmiCSV() {
+        if (artikli.length === 0) {
+            alert("Nemate sačuvanih artikala za preuzimanje!");
+            return;
+        }
+
+        let tekst = "Sifra / Bar-kod,Kolicina\n";
+        artikli.forEach(a => {
+            tekst += `${a.sifra},${a.kolicina}\n`;
+        });
+
+        let blob = new Blob([tekst], { type: "text/plain;charset=utf-8" });
+        let link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = "inventura_2026.txt";
+        link.click();
+    }
+</script>
 </body>
 </html>
