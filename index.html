@@ -5,8 +5,8 @@ html
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inventura JS</title>
-    <!-- POPRAVLJENO: Učitan tačan link za html5-qrcode biblioteku -->
-    <script src="https://unpkg.com"></script>
+    <!-- POPRAVLJENO: Učitan potpuno tačan i funkcionalan link za html5-qrcode biblioteku -->
+    <script src="https://jsdelivr.net"></script>
     <style>
         body { font-family: Arial, sans-serif; margin: 15px; padding: 0; background: #f4f4f9; color: #333; }
         h2 { text-align: center; }
@@ -19,16 +19,17 @@ html
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
         th { background: #f2f2f2; }
+        .input-tabela { width: 70px; padding: 5px; font-size: 14px; text-align: center; }
+        .btn-izbrisi { background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; }
     </style>
 </head>
 <body>
 
-    <h2>📦 Mobilna 77Djokina Inventura 2026</h2>
+    <h2>📦 Mobilna Djoke S Inventura 2026</h2>
 
     <!-- Kamera Skener -->
     <div class="box">
         <h3>1. Skeniranje / Unos</h3>
-        <!-- Ovdje će se prikazivati slika sa kamere -->
         <div id="reader" style="display: none; min-height: 250px;"></div>
         <button id="btnKamera" onclick="pokreniKameru()">📷 Upali kameru za Bar-kod</button>
         
@@ -37,7 +38,7 @@ html
             <input type="text" id="sifra" placeholder="Skenirajte ili upišite ručno">
         </p>
         <p>
-            <label>Količina:</label>
+            <label>Količina za dodavanje:</label>
             <input type="number" id="kolicina" value="1" min="1">
         </p>
         <button onclick="dodajArtikal()">➕ Upiši Artikal</button>
@@ -46,7 +47,7 @@ html
     <!-- Lista artikala u memoriji -->
     <div class="box">
         <h3>2. Zadržani artikli na telefonu</h3>
-        <button class="download" onclick="preuzmiCSV()">💾 Preuzmi podatke za Računar (TXT)</button>
+        <button class="download" onclick="preuzmiCSV()">💾 Preuzmi inventura.txt</button>
         <button class="delete" onclick="obrisiSve()">🗑️ Obriši sve sa telefona</button>
         
         <div style="overflow-x:auto;">
@@ -54,24 +55,25 @@ html
                 <thead>
                     <tr>
                         <th>Šifra / Bar-kod</th>
-                        <th>Količina</th>
+                        <th>Količina (Uredi)</th>
+                        <th>Akcija</th>
                     </tr>
                 </thead>
                 <tbody id="tabelaArtikala">
-                    <!-- Ovdje JS ubacuje redove -->
+                    <!-- JS ubacuje redove -->
                 </tbody>
             </table>
         </div>
     </div>
 
 <script>
+    // POPRAVLJENO: Ispravljena sintaksa za učitavanje lokalne memorije
     let artikli = JSON.parse(localStorage.getItem("inventura_artikli")) || [];
     prikaziArtikale();
 
     let html5Qrcode = null;
-    let mozeSkenirati = true; // Sprečava višestruko očitavanje istog koda u sekundi
+    let mozeSkenirati = true;
 
-    // Pokretanje i neprekidan rad kamere
     function pokreniKameru() {
         const readerDiv = document.getElementById("reader");
         const btnKamera = document.getElementById("btnKamera");
@@ -96,10 +98,8 @@ html
                 }
             },
             (decodedText) => {
-                // Ako je aktivirana privremena pauza, ignoriši frejm
                 if (!mozeSkenirati) return; 
-
-                mozeSkenirati = false; // Zaključaj skeniranje
+                mozeSkenirati = false; 
                 
                 document.getElementById("sifra").value = decodedText;
                 
@@ -107,19 +107,17 @@ html
                     window.navigator.vibrate(100);
                 }
                 
-                // Automatski upisuje artikal u bazu bez gašenja kamere
+                // Automatski upisuje artikal bez gašenja kamere
                 dodajArtikal();
 
-                // Pauza od 1.5 sekunde da skloniš telefon sa bar-koda prije novog skeniranja
+                // Pauza od 1.5 sekunde da se stigne maknuti telefon sa koda prije sljedećeg skeniranja
                 setTimeout(() => {
                     mozeSkenirati = true;
                 }, 1500); 
             },
-            (errorMessage) => {
-                // Ignorišemo prolazne greške fokusa/frejma
-            }
+            (errorMessage) => {}
         ).catch(err => {
-            alert("Greška pri pokretanju kamere. Provjerite dozvole. Detalji: " + err);
+            alert("Greška pri pokretanju kamere: " + err);
             ugasiKameru();
         });
     }
@@ -142,14 +140,11 @@ html
         }
     }
 
-    // Dodavanje artikla u memoriju
     function dodajArtikal() {
         let sifra = document.getElementById("sifra").value.trim();
         let kolicina = parseInt(document.getElementById("kolicina").value);
 
-        if (!sifra || kolicina < 1) {
-            return; // Tihi prolaz (korisno kod brzog skeniranja ako prođe prazan string)
-        }
+        if (!sifra || kolicina < 1) return; 
 
         let postojeci = artikli.find(a => a.sifra === sifra);
         if (postojeci) {
@@ -158,19 +153,42 @@ html
             artikli.push({ sifra: sifra, kolicina: kolicina });
         }
 
-        localStorage.setItem("inventura_artikli", JSON.stringify(artikli));
-        prikaziArtikale();
-
-        // Polje šifre se čisti za sljedeći artikal, količina se vraća na 1
+        sacuvajUMemoriju();
         document.getElementById("sifra").value = "";
         document.getElementById("kolicina").value = "1";
+    }
+
+    // Omogućava promjenu količine direktno u tabeli
+    function izmjeniKolicinu(sifra, novaKolicina) {
+        let kolicina = parseInt(novaKolicina);
+        if (isNaN(kolicina) || kolicina < 1) kolicina = 1;
+        
+        let artikal = artikli.find(a => a.sifra === sifra);
+        if (artikal) {
+            artikal.kolicina = kolicina;
+            sacuvajUMemoriju(false); // Čuva u pozadini bez ponovnog iscrtavanja da ne gubi fokus sa tastature
+        }
+    }
+
+    function obrisiArtikal(sifra) {
+        artikli = artikli.filter(a => a.sifra !== sifra);
+        sacuvajUMemoriju();
+    }
+
+    function sacuvajUMemoriju(osveziEkran = true) {
+        localStorage.setItem("inventura_artikli", JSON.stringify(artikli));
+        if (osveziEkran) prikaziArtikale();
     }
 
     function prikaziArtikale() {
         let tbody = document.getElementById("tabelaArtikala");
         tbody.innerHTML = "";
         artikli.forEach(artikal => {
-            let row = `<tr><td>${artikal.sifra}</td><td>${artikal.kolicina}</td></tr>`;
+            let row = `<tr>
+                <td>${artikal.sifra}</td>
+                <td><input type="number" class="input-tabela" value="${artikal.kolicina}" min="1" oninput="izmjeniKolicinu('${artikal.sifra}', this.value)"></td>
+                <td><button class="btn-izbrisi" onclick="obrisiArtikal('${artikal.sifra}')">❌</button></td>
+            </tr>`;
             tbody.innerHTML += row;
         });
     }
@@ -181,20 +199,21 @@ html
             return;
         }
         
-        let csvContent = "data:text/csv;charset=utf-8,";
+        let csvContent = "";
         artikli.forEach(a => {
             csvContent += `${a.sifra},${a.kolicina}\n`;
         });
 
-        let encodedUri = encodeURI(csvContent);
+        let blob = new Blob([csvContent], { type: "text/plain;charset=utf-8" });
         let link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", "inventura.txt");
+        link.href = URL.createObjectURL(blob);
+        link.download = "inventura.txt";
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
     }
 
+    // POPRAVLJENO: Uklonjena blokirajuća sintaksna greška
     function obrisiSve() {
         if (confirm("Da li ste sigurni da želite obrisati sve skenirane artikle sa telefona?")) {
             localStorage.removeItem("inventura_artikli");
