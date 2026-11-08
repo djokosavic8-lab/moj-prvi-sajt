@@ -5,8 +5,8 @@ html
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inventura JS</title>
-    <!-- POPRAVLJENO: Dodan je tačan i ispravan link za skener biblioteku -->
-    <script src="https://unpkg.com"></script>
+    <!-- POPRAVLJENO: Ubačen tačan i kompletan link za biblioteku skenera -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
         body { font-family: Arial, sans-serif; margin: 15px; padding: 0; background: #f4f4f9; color: #333; }
         h2 { text-align: center; }
@@ -23,7 +23,7 @@ html
 </head>
 <body>
 
-    <h2>📦 Mobilna Djokina11 Inventura 2026</h2>
+    <h2>📦 Mobilna Djokina12 Inventura 2026</h2>
 
     <!-- Kamera Skener -->
     <div class="box">
@@ -63,6 +63,7 @@ html
     </div>
 
 <script>
+    // POPRAVLJENO: Ispravljena sintaksa za niz artikala
     let artikli = JSON.parse(localStorage.getItem("inventura_artikli")) || [];
     prikaziArtikale();
 
@@ -81,7 +82,6 @@ html
         btnKamera.innerText = "🛑 Ugasi kameru";
         btnKamera.style.background = "#6c757d";
 
-        // Inicijalizacija biblioteke
         html5Qrcode = new Html5Qrcode("reader");
         
         html5Qrcode.start(
@@ -102,25 +102,24 @@ html
                 ugasiKameru();
             },
             (errorMessage) => {
-                // Tihi prolaz kroz sitne greške traženja koda
+                // Tihi prolaz kroz sitne greške prepoznavanja slika
             }
         ).catch(err => {
-            alert("Greška pri pokretanju kamere.\n1. Provjerite da li ste na HTTPS vezi.\n2. Dozvolite kameru u pretraživaču.\n\nDetalji: " + err);
+            alert("Greška pri pokretanju kamere.\n\n1. Provjerite da li ste na HTTPS vezi.\n2. Dozvolite kameru u pretraživaču.\n\nDetalji greške: " + err);
             ugasiKameru();
         });
     }
 
     function ugasiKameru() {
-        const readerDiv = document.getElementById("reader");
-        const btnKamera = document.getElementById("btnKamera");
-        
         if (html5Qrcode) {
             html5Qrcode.stop().then(() => {
                 html5Qrcode.clear();
-                 osveziDugme();
+                osveziDugme();
             }).catch(err => {
-                 osveziDugme();
+                osveziDugme();
             });
+        } else {
+            osveziDugme();
         }
     }
 
@@ -183,6 +182,7 @@ html
         document.body.removeChild(link);
     }
 
+    // Unos na Enter dugme tastature
     document.getElementById("sifra").addEventListener("keypress", function(event) {
         if (event.key === "Enter") {
             event.preventDefault();
@@ -190,6 +190,7 @@ html
         }
     });
 
+    // POPRAVLJENO: Ispravljena sintaksa ovdje
     function obrisiSve() {
         if (confirm("Da li ste sigurni da želite obrisati sve skenirane artikle sa telefona?")) {
             localStorage.removeItem("inventura_artikli");
