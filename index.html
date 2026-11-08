@@ -5,7 +5,7 @@ html
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inventura JS</title>
-    <!-- POPRAVLJENO: Učitan tačan i provjeren minifikovani link za skener biblioteku -->
+    <!-- Učitan provjeren link za skener biblioteku -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
     <style>
         body { font-family: Arial, sans-serif; margin: 15px; padding: 0; background: #f4f4f9; color: #333; }
@@ -19,6 +19,12 @@ html
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
         th { background: #f2f2f2; }
+        /* Vizuelno obavještenje za uspješno automatsko skeniranje */
+        .flash-success { animation: flash 0.3s ease-out; }
+        @keyframes flash {
+            0% { background: #28a745; }
+            100% { background: white; }
+        }
     </style>
 </head>
 <body>
@@ -26,7 +32,7 @@ html
     <h2>📦 Mobilna Djokina2 Inventura 2026</h2>
 
     <!-- Kamera Skener -->
-    <div class="box">
+    <div class="box" id="unosBox">
         <h3>1. Skeniranje / Unos</h3>
         <!-- Ovdje će se prikazivati slika sa kamere -->
         <div id="reader" style="display: none; min-height: 250px;"></div>
@@ -65,17 +71,17 @@ html
     </div>
 
 <script>
-    // POPRAVLJENO: Sintaksa ispravljena
     let artikli = JSON.parse(localStorage.getItem("inventura_artikli")) || [];
     prikaziArtikale();
 
     let html5Qrcode = null;
+    let zadnjiSkeniraniKod = "";
+    let zadnjeVrijemeSkeniranja = 0;
 
     function pokreniKameru() {
         const readerDiv = document.getElementById("reader");
         const btnKamera = document.getElementById("btnKamera");
 
-        // Ako skener već radi, ugasi ga na klik dugmeta
         if (html5Qrcode && html5Qrcode.isScanning) {
             ugasiKameru();
             return;
@@ -85,13 +91,12 @@ html
         btnKamera.innerText = "🛑 Ugasi kameru";
         btnKamera.style.background = "#6c757d";
 
-        // Inicijalizacija objekta iz učitane cdnjs biblioteke
         if (!html5Qrcode) {
             html5Qrcode = new Html5Qrcode("reader");
         }
         
         const config = {
-            fps: 15,
+            fps: 20, // Povećan FPS za brži odziv kamere
             qrbox: function(width, height) {
                 return { width: Math.floor(width * 0.8), height: Math.floor(height * 0.4) };
             },
@@ -104,13 +109,24 @@ html
             { facingMode: "environment" }, 
             config,
             (decodedText) => {
+                let sada = Date.now();
+                
+                // Zaštita da ne skenira isti kod više puta u sekundi ako ruku držiš mirno
+                if (decodedText === zadnjiSkeniraniKod && (sada - zadnjeVrijemeSkeniranja < 1500)) {
+                    return; 
+                }
+
+                zadnjiSkeniraniKod = decodedText;
+                zadnjeVrijemeSkeniranja = sada;
+
                 document.getElementById("sifra").value = decodedText;
                 
                 if (window.navigator && window.navigator.vibrate) {
                     window.navigator.vibrate(100);
                 }
                 
-                ugasiKameru();
+                // AUTOMATSKI UPIS: Odmah dodaj artikal i nastavi skenirati
+                dodajArtikalAutomatski(decodedText);
             },
             (errorMessage) => {
                 // Ignorišemo frejmove koji nemaju kod
@@ -130,6 +146,7 @@ html
                 readerDiv.style.display = "none";
                 btnKamera.innerText = "📷 Upali kameru za Bar-kod";
                 btnKamera.style.background = "#007bff";
+                zadnjiSkeniraniKod = ""; // Resetuj keš kod gasenja
             }).catch(err => {
                 console.error("Greška pri gašenju:", err);
                 readerDiv.style.display = "none";
@@ -143,6 +160,33 @@ html
         }
     }
 
+    // Funkcija koja obavlja automatski upis prilikom kontinualnog skeniranja kamerom
+    function dodajArtikalAutomatski(sifraKoda) {
+        let sifra = sifraKoda.trim();
+        let kolicina = parseInt(document.getElementById("kolicina").value) || 1;
+
+        let postojeci = artikli.find(a => a.sifra === sifra);
+        if (postojeci) {
+            postojeci.kolicina += kolicina;
+        } else {
+            artikli.push({ sifra: sifra, kolicina: kolicina });
+        }
+
+        localStorage.setItem("inventura_artikli", JSON.stringify(artikli));
+        prikaziArtikale();
+
+        // Očisti polje za unos šifre, količinu vrati na 1, ali ostavi kameru aktivnom
+        document.getElementById("sifra").value = "";
+        document.getElementById("kolicina").value = "1";
+
+        // Efekat zelenog bljeska na ekranu kao potvrda da je artikal upisan
+        const unosBox = document.getElementById("unosBox");
+        unosBox.classList.remove("flash-success");
+        void unosBox.offsetWidth; // Triki trik za restart CSS animacije
+        unosBox.classList.add("flash-success");
+    }
+
+    // Standardna funkcija za ručni upis preko dugmeta "Upiši Artikal"
     function dodajArtikal() {
         let sifra = document.getElementById("sifra").value.trim();
         let kolicina = parseInt(document.getElementById("kolicina").value);
@@ -164,12 +208,15 @@ html
 
         document.getElementById("sifra").value = "";
         document.getElementById("kolicina").value = "1";
+        zadnjiSkeniraniKod = ""; // Dozvoli ponovno skeniranje istog koda ako je rucno brisan
     }
 
     function prikaziArtikale() {
         let tbody = document.getElementById("tabelaArtikala");
         tbody.innerHTML = "";
-        artikli.forEach(artikal => {
+        // Prikazuje najnovije skenirane artikle na vrhu tabele radi lakšeg praćenja na telefonu
+        let obrnutiArtikli = [...artikli].reverse();
+        obrnutiArtikli.forEach(artikal => {
             let row = `<tr><td>${artikal.sifra}</td><td>${artikal.kolicina}</td></tr>`;
             tbody.innerHTML += row;
         });
@@ -200,8 +247,9 @@ html
     function obrisiSve() {
         if (confirm("Da li ste sigurni da želite obrisati sve skenirane artikle sa telefona?")) {
             localStorage.removeItem("inventura_artikli");
-            artikli = []; // POPRAVLJENO: Sintaksa očišćena
+            artikli = [];
             prikaziArtikale();
+            zadnjiSkeniraniKod = "";
         }
     }
 </script>
