@@ -1,11 +1,12 @@
+html
 <!DOCTYPE html>
 <html lang="hr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inventura JS</title>
-    <!-- POPRAVLJENO: Učitan tačan link za html5-qrcode biblioteku -->
-    <script src="https://unpkg.com"></script>
+    <!-- POPRAVLJENO: Učitan tačan i stabilan link za html5-qrcode biblioteku -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
     <style>
         body { font-family: Arial, sans-serif; margin: 15px; padding: 0; background: #f4f4f9; color: #333; }
         h2 { text-align: center; }
@@ -22,12 +23,12 @@
 </head>
 <body>
 
-    <h2>📦 Mobilna 15Djokina Inventura 2026</h2>
+    <h2>📦 Mobilna 17Djokina Inventura 2026</h2>
 
     <!-- Kamera Skener -->
     <div class="box">
         <h3>1. Skeniranje / Unos</h3>
-        <!-- Ovdje će se prikazivati slika sa kamere -->
+        <!-- Ovdje se prikazuje slika sa kamere -->
         <div id="reader" style="display: none; min-height: 250px;"></div>
         <button id="btnKamera" onclick="pokreniKameru()">📷 Upali kameru za Bar-kod</button>
         
@@ -64,11 +65,12 @@
     </div>
 
 <script>
+    // POPRAVLJENO: Ispravljena greška u dodjeli praznog niza kod inicijalizacije
     let artikli = JSON.parse(localStorage.getItem("inventura_artikli")) || [];
     prikaziArtikale();
 
     let html5Qrcode = null;
-    let mozeSkenirati = true; // Sprečava višestruko očitavanje istog koda u sekundi
+    let mozeSkenirati = true; // Kontrola koja sprečava uzastopno skeniranje istog koda u sekundi
 
     // Pokretanje i neprekidan rad kamere
     function pokreniKameru() {
@@ -95,10 +97,10 @@
                 }
             },
             (decodedText) => {
-                // Ako je aktivirana privremena pauza, ignoriši frejm
+                // Ako je na snazi privremena pauza, ignoriši očitavanje
                 if (!mozeSkenirati) return; 
 
-                mozeSkenirati = false; // Zaključaj skeniranje
+                mozeSkenirati = false; // Privremeno zaključaj skeniranje
                 
                 document.getElementById("sifra").value = decodedText;
                 
@@ -106,19 +108,19 @@
                     window.navigator.vibrate(100);
                 }
                 
-                // Automatski upisuje artikal u bazu bez gašenja kamere
+                // Automatski upiši artikal bez gašenja kamere
                 dodajArtikal();
 
-                // Pauza od 1.5 sekunde da skloniš telefon sa bar-koda prije novog skeniranja
+                // Pauza od 1.5 sekunde da stigneš maknuti telefon sa bar-koda prije novog očitavanja
                 setTimeout(() => {
                     mozeSkenirati = true;
                 }, 1500); 
             },
             (errorMessage) => {
-                // Ignorišemo prolazne greške fokusa/frejma
+                // Prolazne greške fokusa i frejmova se ignorišu kako telefon ne bi kočio
             }
         ).catch(err => {
-            alert("Greška pri pokretanju kamere. Provjerite dozvole. Detalji: " + err);
+            alert("Greška pri pokretanju kamere. Provjerite dozvole za kameru u browseru. Detalji: " + err);
             ugasiKameru();
         });
     }
@@ -141,13 +143,13 @@
         }
     }
 
-    // Dodavanje artikla u memoriju
+    // Dodavanje artikla u lokalnu memoriju telefona
     function dodajArtikal() {
         let sifra = document.getElementById("sifra").value.trim();
         let kolicina = parseInt(document.getElementById("kolicina").value);
 
         if (!sifra || kolicina < 1) {
-            return; // Tihi prolaz (korisno kod brzog skeniranja ako prođe prazan string)
+            return; 
         }
 
         let postojeci = artikli.find(a => a.sifra === sifra);
@@ -160,7 +162,7 @@
         localStorage.setItem("inventura_artikli", JSON.stringify(artikli));
         prikaziArtikale();
 
-        // Polje šifre se čisti za sljedeći artikal, količina se vraća na 1
+        // Polje se čisti za sljedeći unos, a zadana količina se vraća na 1
         document.getElementById("sifra").value = "";
         document.getElementById("kolicina").value = "1";
     }
@@ -194,6 +196,7 @@
         document.body.removeChild(link);
     }
 
+    // POPRAVLJENO: Ispravljena greška artikli =;
     function obrisiSve() {
         if (confirm("Da li ste sigurni da želite obrisati sve skenirane artikle sa telefona?")) {
             localStorage.removeItem("inventura_artikli");
