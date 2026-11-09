@@ -5,7 +5,6 @@ html
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inventura JS</title>
-    <!-- POPRAVLJENO: Učitan tačan i stabilan link za html5-qrcode biblioteku -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
     <style>
         body { font-family: Arial, sans-serif; margin: 15px; padding: 0; background: #f4f4f9; color: #333; }
@@ -14,6 +13,7 @@ html
         button { width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 5px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 8px; }
         button.delete { background: #dc3545; }
         button.download { background: #28a745; }
+        button.drive { background: #ff5722; color: white; margin-top: 15px; }
         button.edit { background: #ffc107; color: #212529; padding: 6px 10px; font-size: 14px; width: auto; margin-top: 0; }
         input { width: 94%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; }
         #reader { width: 100%; border-radius: 8px; overflow: hidden; margin-top: 10px; background: #eee; }
@@ -24,12 +24,11 @@ html
 </head>
 <body>
 
-    <h2>📦 Mobilna Gio Djokina Inventura 2026</h2>
+    <h2>📦 Mobilna Sav Djokina Inventura 2026</h2>
 
     <!-- Kamera Skener -->
     <div class="box">
         <h3>1. Skeniranje / Unos</h3>
-        <!-- Ovdje se prikazuje slika sa kamere -->
         <div id="reader" style="display: none; min-height: 250px;"></div>
         <button id="btnKamera" onclick="pokreniKameru()">📷 Upali kameru za Bar-kod</button>
         
@@ -47,8 +46,15 @@ html
     <!-- Lista artikala u memoriji -->
     <div class="box">
         <h3>2. Zadržani artikli na telefonu</h3>
-        <button class="download" onclick="preuzmiCSV()">💾 Preuzmi podatke za Računar (TXT)</button>
+        <button class="download" onclick="preuzmiCSV()">💾 Preuzmi lokalno na telefon (TXT)</button>
         <button class="delete" onclick="obrisiSve()">🗑️ Obriši sve sa telefona</button>
+        
+        <!-- Ovdje je ubačeno dugme i skrivena forma za slanje na Google Drive -->
+        <form id="driveForma" action="https://formspree.io" method="POST" style="display:none;">
+            <textarea name="Sadržaj Inventure" id="formaSadrzaj"></textarea>
+            <input type="text" name="_subject" value="Nova Inventura 2026">
+        </form>
+        <button class="drive" onclick="posaljiNaGoogleDrive()">🚀 Pošalji inventuru direktno na Google Drive</button>
         
         <div style="overflow-x:auto;">
             <table>
@@ -60,21 +66,19 @@ html
                     </tr>
                 </thead>
                 <tbody id="tabelaArtikala">
-                    <!-- Ovdje JS ubacuje redove -->
+                    <!-- JS ubacuje redove -->
                 </tbody>
             </table>
         </div>
     </div>
 
 <script>
-    // POPRAVLJENO: Ispravljena greška u dodjeli praznog niza kod inicijalizacije
     let artikli = JSON.parse(localStorage.getItem("inventura_artikli")) || [];
     prikaziArtikale();
 
     let html5Qrcode = null;
-    let mozeSkenirati = true; // Kontrola koja sprečava uzastopno skeniranje istog koda u sekundi
+    let mozeSkenirati = true;
 
-    // Pokretanje i neprekidan rad kamere
     function pokreniKameru() {
         const readerDiv = document.getElementById("reader");
         const btnKamera = document.getElementById("btnKamera");
@@ -99,10 +103,8 @@ html
                 }
             },
             (decodedText) => {
-                // Ako je na snazi privremena pauza, ignoriši očitavanje
                 if (!mozeSkenirati) return; 
-
-                mozeSkenirati = false; // Privremeno zaključaj skeniranje
+                mozeSkenirati = false; 
                 
                 document.getElementById("sifra").value = decodedText;
                 
@@ -110,19 +112,15 @@ html
                     window.navigator.vibrate(100);
                 }
                 
-                // Automatski upiši artikal bez gašenja kamere
                 dodajArtikal();
 
-                // Pauza od 1.5 sekunde da stigneš maknuti telefon sa bar-koda prije novog očitavanja
                 setTimeout(() => {
                     mozeSkenirati = true;
                 }, 1500); 
             },
-            (errorMessage) => {
-                // Prolazne greške fokusa i frejmova se ignorišu kako telefon ne bi kočio
-            }
+            (errorMessage) => {}
         ).catch(err => {
-            alert("Greška pri pokretanju kamere. Provjerite dozvole za kameru u browseru. Detalji: " + err);
+            alert("Greška pri pokretanju kamere: " + err);
             ugasiKameru();
         });
     }
@@ -145,14 +143,11 @@ html
         }
     }
 
-    // Dodavanje artikla u lokalnu memoriju telefona
     function dodajArtikal() {
         let sifra = document.getElementById("sifra").value.trim();
         let kolicina = parseInt(document.getElementById("kolicina").value);
 
-        if (!sifra || kolicina < 1) {
-            return; 
-        }
+        if (!sifra || kolicina < 1) return; 
 
         let postojeci = artikli.find(a => a.sifra === sifra);
         if (postojeci) {
@@ -164,18 +159,14 @@ html
         localStorage.setItem("inventura_artikli", JSON.stringify(artikli));
         prikaziArtikale();
 
-        // Polje se čisti za sljedeći unos, a zadana količina se vraća na 1
         document.getElementById("sifra").value = "";
         document.getElementById("kolicina").value = "1";
     }
 
-    // NOVA FUNKCIJA: Omogućava direktnu izmjenu količine klikom na dugme u tabeli
     function izmjeniKolicinu(sifraArtikla) {
         let artikal = artikli.find(a => a.sifra === sifraArtikla);
         if (artikal) {
             let novaKolicina = prompt(`Unesite novu količinu za artikal ${sifraArtikla}:`, artikal.kolicina);
-            
-            // Provjera da li je korisnik kliknuo Cancel ili unio nevažeći broj
             if (novaKolicina === null) return; 
             
             let uneseniBroj = parseInt(novaKolicina);
@@ -184,7 +175,6 @@ html
                 return;
             }
 
-            // Ako postaviš količinu na 0, artikal se briše iz liste (opcionalno, ali vrlo korisno)
             if (uneseniBroj === 0) {
                 if (confirm("Količina je 0. Želite li ukloniti ovaj artikal iz inventure?")) {
                     artikli = artikli.filter(a => a.sifra !== sifraArtikla);
@@ -200,49 +190,68 @@ html
         }
     }
 
+    // POPRAVLJENO I ZAVRŠENO: Generisanje tabele na ekranu
     function prikaziArtikale() {
         let tbody = document.getElementById("tabelaArtikala");
         tbody.innerHTML = "";
+        
         artikli.forEach(artikal => {
-            // Dodano žuto dugme "Otvori izmjenu" u svaki red tabele
-            let row = `<tr>
+            let tr = document.createElement("tr");
+            tr.innerHTML = `
                 <td>${artikal.sifra}</td>
                 <td>${artikal.kolicina}</td>
-                <td><button class="edit" onclick="izmjeniKolicinu('${artikal.sifra}')">✏️ Izmjena</button></td>
-            </tr>`;
-            tbody.innerHTML += row;
+                <td><button class="edit" onclick="izmjeniKolicinu('${artikal.sifra}')">✏️ Izmjeni</button></td>
+            `;
+            tbody.appendChild(tr);
         });
     }
 
-    function preuzmiCSV() {
-        if (artikli.length === 0) {
-            alert("Nema podataka za preuzimanje!");
-            return;
-        }
-        
-        let csvContent = "data:text/csv;charset=utf-8,";
+    // Funkcija koja pretvara podatke iz memorije u tekstualni format za fajl
+    function generisiTekstInventure() {
+        if (artikli.length === 0) return "";
+        let tekst = "Šifra/Bar-kod, Količina\n";
         artikli.forEach(a => {
-            csvContent += `${a.sifra},${a.kolicina}\n`;
+            tekst += `${a.sifra}, ${a.kolicina}\n`;
         });
-
-        let encodedUri = encodeURI(csvContent);
-        let link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", "inventura.txt");
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        return tekst;
     }
 
-    // POPRAVLJENO: Ispravljena greška artikli =;
+    // Lokalno preuzimanje TXT fajla na telefon
+    function preuzmiCSV() {
+        let sadrzaj = generisiTekstInventure();
+        if (!sadrzaj) { alert("Nema artikala za preuzimanje."); return; }
+        
+        let blob = new Blob([sadrzaj], { type: "text/plain;charset=utf-8" });
+        let link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = "inventura.txt";
+        link.click();
+        URL.revokeObjectURL(link.href);
+    }
+
     function obrisiSve() {
         if (confirm("Da li ste sigurni da želite obrisati sve skenirane artikle sa telefona?")) {
-            localStorage.removeItem("inventura_artikli");
             artikli = [];
+            localStorage.removeItem("inventura_artikli");
             prikaziArtikale();
         }
     }
-</script>
 
+    // NOVA FUNKCIJA: Slanje sakupljenog teksta direktno prema Formspree -> Google Drive
+    function posaljiNaGoogleDrive() {
+        let sadrzaj = generisiTekstInventure();
+        if (!sadrzaj) {
+            alert("Nema artikala u listi. Prvo skenirajte nešto!");
+            return;
+        }
+
+        // Ubacujemo tekst u skriveno polje forme
+        document.getElementById("formaSadrzaj").value = sadrzaj;
+        
+        // Šaljemo formu servisu
+        document.getElementById("driveForma").submit();
+        alert("Podaci se šalju! Bićete preusmjereni na potvrdnu stranicu.");
+    }
+</script>
 </body>
 </html>
