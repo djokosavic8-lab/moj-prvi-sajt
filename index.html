@@ -190,7 +190,6 @@ html
         }
     }
 
-    // POPRAVLJENO I ZAVRŠENO: Generisanje tabele na ekranu
     function prikaziArtikale() {
         let tbody = document.getElementById("tabelaArtikala");
         tbody.innerHTML = "";
@@ -206,52 +205,49 @@ html
         });
     }
 
-    // Funkcija koja pretvara podatke iz memorije u tekstualni format za fajl
+    // Promijenjena funkcija: uklonjen naslov i dodat ';' kao separator
     function generisiTekstInventure() {
         if (artikli.length === 0) return "";
-        let tekst = "Šifra/Bar-kod, Količina\n";
-        artikli.forEach(a => {
-            tekst += `${a.sifra}, ${a.kolicina}\n`;
+        let tekst = ""; // Naslov je uspješno uklonjen odavde
+        artikli.forEach(artikal => {
+            tekst += `${artikal.sifra};${artikal.kolicina}\n`; // Korišten ; umjesto ,
         });
         return tekst;
     }
 
-    // Lokalno preuzimanje TXT fajla na telefon
     function preuzmiCSV() {
         let sadrzaj = generisiTekstInventure();
-        if (!sadrzaj) { alert("Nema artikala za preuzimanje."); return; }
-        
+        if (!sadrzaj) {
+            alert("Nema podataka za preuzimanje.");
+            return;
+        }
         let blob = new Blob([sadrzaj], { type: "text/plain;charset=utf-8" });
         let link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
         link.download = "inventura.txt";
         link.click();
-        URL.revokeObjectURL(link.href);
     }
 
-    function obrisiSve() {
-        if (confirm("Da li ste sigurni da želite obrisati sve skenirane artikle sa telefona?")) {
-            artikli = [];
-            localStorage.removeItem("inventura_artikli");
-            prikaziArtikale();
-        }
-    }
-
-    // NOVA FUNKCIJA: Slanje sakupljenog teksta direktno prema Formspree -> Google Drive
     function posaljiNaGoogleDrive() {
         let sadrzaj = generisiTekstInventure();
         if (!sadrzaj) {
-            alert("Nema artikala u listi. Prvo skenirajte nešto!");
+            alert("Nema podataka za slanje.");
             return;
         }
-
-        // Ubacujemo tekst u skriveno polje forme
         document.getElementById("formaSadrzaj").value = sadrzaj;
-        
-        // Šaljemo formu servisu
+        alert("Pokrećem slanje na Google Drive (preko Formspree)...");
         document.getElementById("driveForma").submit();
-        alert("Podaci se šalju! Bićete preusmjereni na potvrdnu stranicu.");
+    }
+
+    function obrisiSve() {
+        if (confirm("Jeste li sigurni da želite obrisati SVE artikle sa ovog telefona? Ovo se ne može vratiti.")) {
+            artikli = [];
+            localStorage.removeItem("inventura_artikli");
+            prikaziArtikale();
+            alert("Svi podaci su obrisani lokalno.");
+        }
     }
 </script>
+
 </body>
 </html>
