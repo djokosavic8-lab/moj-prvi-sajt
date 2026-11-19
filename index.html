@@ -13,7 +13,7 @@ html
         button { width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 5px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 8px; }
         button.delete { background: #dc3545; }
         button.download { background: #28a745; }
-        button.server { background: #ff5722; color: white; margin-top: 15px; }
+        button.drive { background: #ff5722; color: white; margin-top: 15px; }
         button.edit { background: #ffc107; color: #212529; padding: 6px 10px; font-size: 14px; width: auto; margin-top: 0; }
         input { width: 94%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; }
         #reader { width: 100%; border-radius: 8px; overflow: hidden; margin-top: 10px; background: #eee; }
@@ -24,7 +24,7 @@ html
 </head>
 <body>
 
-    <h2>📦 Mobilna GIOCO-djokosavic Inventura 2026</h2>
+    <h2>📦 Mobilna GIO*djokosavic Inventura 2026</h2>
 
     <!-- Kamera Skener -->
     <div class="box">
@@ -48,7 +48,7 @@ html
         <h3>2. Zadržani artikli na telefonu</h3>
         <button class="download" onclick="preuzmiCSV()">💾 Preuzmi lokalno na telefon (TXT)</button>
         <button class="delete" onclick="obrisiSve()">🗑️ Obriši sve sa telefona</button>
-        <button class="server" onclick="posaljiNaServer()">🚀 Pošalji inventuru na C:/server</button>
+        <button class="drive" onclick="posaljiNaServer()">🚀 Pošalji inventuru na Laptop (Server)</button>
         
         <div style="overflow-x:auto;">
             <table>
@@ -60,15 +60,13 @@ html
                     </tr>
                 </thead>
                 <tbody id="tabelaArtikala">
+                    <!-- JS ubacuje redove -->
                 </tbody>
             </table>
         </div>
     </div>
 
 <script>
-    // Adresa vašeg Python servera
-    const SERVER_URL = "http://10.53.98";
-
     let artikli = JSON.parse(localStorage.getItem("inventura_artikli")) || [];
     prikaziArtikale();
 
@@ -143,7 +141,7 @@ html
         let sifra = document.getElementById("sifra").value.trim();
         let kolicina = parseInt(document.getElementById("kolicina").value);
 
-        if (!sifra || isNaN(kolicina) || kolicina < 1) return; 
+        if (!sifra || kolicina < 1) return; 
 
         let postojeci = artikli.find(a => a.sifra === sifra);
         if (postojeci) {
@@ -213,7 +211,7 @@ html
     function preuzmiCSV() {
         let tekst = generisiTekstInventure();
         if (!tekst) {
-            alert("Nema artikala za preuzimanje!");
+            alert("Lista je prazna!");
             return;
         }
         let blob = new Blob([tekst], { type: "text/plain;charset=utf-8" });
@@ -224,7 +222,7 @@ html
     }
 
     function obrisiSve() {
-        if (confirm("Jeste li sigurni da želite obrisati sve artikle sa telefona?")) {
+        if (confirm("Da li ste sigurni da želite obrisati sve artikle sa telefona?")) {
             artikli = [];
             localStorage.removeItem("inventura_artikli");
             prikaziArtikale();
@@ -238,22 +236,22 @@ html
             return;
         }
 
-        fetch(SERVER_URL, {
+        fetch("http://10.53.98", {
             method: "POST",
             headers: {
-                "Content-Type": "text/plain; charset=utf-8"
+                "Content-Type": "application/json"
             },
-            body: tekst
+            body: JSON.stringify({ podaci: tekst })
         })
         .then(response => {
-            if (!response.ok) throw new Error("Greška servera: " + response.status);
-            return response.text();
-        })
-        .then(data => {
-            alert("✅ Inventura je uspješno poslana na C:/server!");
+            if (response.ok) {
+                alert("✅ Inventura je uspješno upisana u inventura.txt na laptopu!");
+            } else {
+                alert("❌ Server je javio grešku pri snimanju.");
+            }
         })
         .catch(error => {
-            alert("❌ Slanje nije uspjelo: " + error.message + "\n\nProvjerite:\n1. Da li je Python server pokrenut na računaru\n2. Da li ste dozvolili 'Insecure content' (HTTP) u podešavanjima pregledača za ovaj GitHub sajt.");
+            alert("⚠️ Ne mogu da se povežem sa laptopom (http://10.53.98.10:3000). Provjerite Wi-Fi i da li je server upaljen.");
         });
     }
 </script>
