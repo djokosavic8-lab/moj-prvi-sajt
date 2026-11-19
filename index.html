@@ -5,7 +5,7 @@ html
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inventura JS</title>
-    <script src="https://cloudflare.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
     <style>
         body { font-family: Arial, sans-serif; margin: 15px; padding: 0; background: #f4f4f9; color: #333; }
         h2 { text-align: center; }
@@ -24,7 +24,7 @@ html
 </head>
 <body>
 
-    <h2>📦 Mobilna GIO*djokosavic Inventura 2026</h2>
+    <h2>📦 Mobilna GIOCO*djokosavic Inventura 2026</h2>
 
     <!-- Kamera Skener -->
     <div class="box">
@@ -48,7 +48,13 @@ html
         <h3>2. Zadržani artikli na telefonu</h3>
         <button class="download" onclick="preuzmiCSV()">💾 Preuzmi lokalno na telefon (TXT)</button>
         <button class="delete" onclick="obrisiSve()">🗑️ Obriši sve sa telefona</button>
-        <button class="drive" onclick="posaljiNaServer()">🚀 Pošalji inventuru na Laptop (Server)</button>
+        
+        <!-- Ovdje je ubačeno dugme i skrivena forma za slanje na Google Drive -->
+        <form id="driveForma" action="https://formspree.io" method="POST" style="display:none;">
+            <textarea name="Sadržaj Inventure" id="formaSadrzaj"></textarea>
+            <input type="text" name="_subject" value="Nova Inventura 2026">
+        </form>
+        <button class="drive" onclick="posaljiNaGoogleDrive()">🚀 Pošalji inventuru direktno na Google Drive</button>
         
         <div style="overflow-x:auto;">
             <table>
@@ -199,61 +205,49 @@ html
         });
     }
 
+    // Promijenjena funkcija: uklonjen naslov i dodat ';' kao separator
     function generisiTekstInventure() {
         if (artikli.length === 0) return "";
-        let tekst = "";
+        let tekst = ""; // Naslov je uspješno uklonjen odavde
         artikli.forEach(artikal => {
-            tekst += `${artikal.sifra};${artikal.kolicina}\n`;
+            tekst += `${artikal.sifra};${artikal.kolicina}\n`; // Korišten ; umjesto ,
         });
         return tekst;
     }
 
     function preuzmiCSV() {
-        let tekst = generisiTekstInventure();
-        if (!tekst) {
-            alert("Lista je prazna!");
+        let sadrzaj = generisiTekstInventure();
+        if (!sadrzaj) {
+            alert("Nema podataka za preuzimanje.");
             return;
         }
-        let blob = new Blob([tekst], { type: "text/plain;charset=utf-8" });
+        let blob = new Blob([sadrzaj], { type: "text/plain;charset=utf-8" });
         let link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
         link.download = "inventura.txt";
         link.click();
     }
 
+    function posaljiNaGoogleDrive() {
+        let sadrzaj = generisiTekstInventure();
+        if (!sadrzaj) {
+            alert("Nema podataka za slanje.");
+            return;
+        }
+        document.getElementById("formaSadrzaj").value = sadrzaj;
+        alert("Pokrećem slanje na Google Drive (preko Formspree)...");
+        document.getElementById("driveForma").submit();
+    }
+
     function obrisiSve() {
-        if (confirm("Da li ste sigurni da želite obrisati sve artikle sa telefona?")) {
+        if (confirm("Jeste li sigurni da želite obrisati SVE artikle sa ovog telefona? Ovo se ne može vratiti.")) {
             artikli = [];
             localStorage.removeItem("inventura_artikli");
             prikaziArtikale();
+            alert("Svi podaci su obrisani lokalno.");
         }
-    }
-
-    function posaljiNaServer() {
-        let tekst = generisiTekstInventure();
-        if (!tekst) {
-            alert("Nema artikala za slanje!");
-            return;
-        }
-
-        fetch("http://10.53.98", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ podaci: tekst })
-        })
-        .then(response => {
-            if (response.ok) {
-                alert("✅ Inventura je uspješno upisana u inventura.txt na laptopu!");
-            } else {
-                alert("❌ Server je javio grešku pri snimanju.");
-            }
-        })
-        .catch(error => {
-            alert("⚠️ Ne mogu da se povežem sa laptopom (http://10.53.98.10:3000). Provjerite Wi-Fi i da li je server upaljen.");
-        });
     }
 </script>
+
 </body>
 </html>
