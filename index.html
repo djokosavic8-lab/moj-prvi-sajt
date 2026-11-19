@@ -5,7 +5,7 @@ html
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inventura JS</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+    <script src="https://cloudflare.com"></script>
     <style>
         body { font-family: Arial, sans-serif; margin: 15px; padding: 0; background: #f4f4f9; color: #333; }
         h2 { text-align: center; }
@@ -13,7 +13,7 @@ html
         button { width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 5px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 8px; }
         button.delete { background: #dc3545; }
         button.download { background: #28a745; }
-        button.drive { background: #ff5722; color: white; margin-top: 15px; }
+        button.server { background: #ff5722; color: white; margin-top: 15px; }
         button.edit { background: #ffc107; color: #212529; padding: 6px 10px; font-size: 14px; width: auto; margin-top: 0; }
         input { width: 94%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; }
         #reader { width: 100%; border-radius: 8px; overflow: hidden; margin-top: 10px; background: #eee; }
@@ -24,7 +24,7 @@ html
 </head>
 <body>
 
-    <h2>📦 Mobilna djokosavic Inventura 2026</h2>
+    <h2>📦 Mobilna GIOCO-djokosavic Inventura 2026</h2>
 
     <!-- Kamera Skener -->
     <div class="box">
@@ -48,13 +48,7 @@ html
         <h3>2. Zadržani artikli na telefonu</h3>
         <button class="download" onclick="preuzmiCSV()">💾 Preuzmi lokalno na telefon (TXT)</button>
         <button class="delete" onclick="obrisiSve()">🗑️ Obriši sve sa telefona</button>
-        
-        <!-- Ovdje je ubačeno dugme i skrivena forma za slanje na Google Drive -->
-        <form id="driveForma" action="https://formspree.io" method="POST" style="display:none;">
-            <textarea name="Sadržaj Inventure" id="formaSadrzaj"></textarea>
-            <input type="text" name="_subject" value="Nova Inventura 2026">
-        </form>
-        <button class="drive" onclick="posaljiNaGoogleDrive()">🚀 Pošalji inventuru direktno na Google Drive</button>
+        <button class="server" onclick="posaljiNaServer()">🚀 Pošalji inventuru na C:/server</button>
         
         <div style="overflow-x:auto;">
             <table>
@@ -66,13 +60,15 @@ html
                     </tr>
                 </thead>
                 <tbody id="tabelaArtikala">
-                    <!-- JS ubacuje redove -->
                 </tbody>
             </table>
         </div>
     </div>
 
 <script>
+    // Adresa vašeg Python servera
+    const SERVER_URL = "http://10.53.98";
+
     let artikli = JSON.parse(localStorage.getItem("inventura_artikli")) || [];
     prikaziArtikale();
 
@@ -147,7 +143,7 @@ html
         let sifra = document.getElementById("sifra").value.trim();
         let kolicina = parseInt(document.getElementById("kolicina").value);
 
-        if (!sifra || kolicina < 1) return; 
+        if (!sifra || isNaN(kolicina) || kolicina < 1) return; 
 
         let postojeci = artikli.find(a => a.sifra === sifra);
         if (postojeci) {
@@ -205,49 +201,61 @@ html
         });
     }
 
-    // Promijenjena funkcija: uklonjen naslov i dodat ';' kao separator
     function generisiTekstInventure() {
         if (artikli.length === 0) return "";
-        let tekst = ""; // Naslov je uspješno uklonjen odavde
+        let tekst = "";
         artikli.forEach(artikal => {
-            tekst += `${artikal.sifra};${artikal.kolicina}\n`; // Korišten ; umjesto ,
+            tekst += `${artikal.sifra};${artikal.kolicina}\n`;
         });
         return tekst;
     }
 
     function preuzmiCSV() {
-        let sadrzaj = generisiTekstInventure();
-        if (!sadrzaj) {
-            alert("Nema podataka za preuzimanje.");
+        let tekst = generisiTekstInventure();
+        if (!tekst) {
+            alert("Nema artikala za preuzimanje!");
             return;
         }
-        let blob = new Blob([sadrzaj], { type: "text/plain;charset=utf-8" });
+        let blob = new Blob([tekst], { type: "text/plain;charset=utf-8" });
         let link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
         link.download = "inventura.txt";
         link.click();
     }
 
-    function posaljiNaGoogleDrive() {
-        let sadrzaj = generisiTekstInventure();
-        if (!sadrzaj) {
-            alert("Nema podataka za slanje.");
-            return;
-        }
-        document.getElementById("formaSadrzaj").value = sadrzaj;
-        alert("Pokrećem slanje na Google Drive (preko Formspree)...");
-        document.getElementById("driveForma").submit();
-    }
-
     function obrisiSve() {
-        if (confirm("Jeste li sigurni da želite obrisati SVE artikle sa ovog telefona? Ovo se ne može vratiti.")) {
+        if (confirm("Jeste li sigurni da želite obrisati sve artikle sa telefona?")) {
             artikli = [];
             localStorage.removeItem("inventura_artikli");
             prikaziArtikale();
-            alert("Svi podaci su obrisani lokalno.");
         }
     }
-</script>
 
+    function posaljiNaServer() {
+        let tekst = generisiTekstInventure();
+        if (!tekst) {
+            alert("Nema artikala za slanje!");
+            return;
+        }
+
+        fetch(SERVER_URL, {
+            method: "POST",
+            headers: {
+                "Content-Type": "text/plain; charset=utf-8"
+            },
+            body: tekst
+        })
+        .then(response => {
+            if (!response.ok) throw new Error("Greška servera: " + response.status);
+            return response.text();
+        })
+        .then(data => {
+            alert("✅ Inventura je uspješno poslana na C:/server!");
+        })
+        .catch(error => {
+            alert("❌ Slanje nije uspjelo: " + error.message + "\n\nProvjerite:\n1. Da li je Python server pokrenut na računaru\n2. Da li ste dozvolili 'Insecure content' (HTTP) u podešavanjima pregledača za ovaj GitHub sajt.");
+        });
+    }
+</script>
 </body>
 </html>
