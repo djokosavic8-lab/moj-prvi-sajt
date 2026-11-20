@@ -5,7 +5,8 @@ html
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inventura JS</title>
-    <script src="https://cloudflare.com"></script>
+    <!-- ISPRAVLJEN LINK KA BIBLIOTECI ZA SKENER -->
+    <script src="https://unpkg.com" type="text/javascript"></script>
     <style>
         body { font-family: Arial, sans-serif; margin: 15px; padding: 0; background: #f4f4f9; color: #333; }
         h2 { text-align: center; }
@@ -25,7 +26,7 @@ html
 </head>
 <body>
 
-    <h2>📦 Mobilna Djokosavic Inventura 2026</h2>
+    <h2>📦 Mobilna gio*Djokosavic Inventura 2026</h2>
 
     <!-- Kamera Skener -->
     <div class="box">
@@ -64,7 +65,6 @@ html
                     </tr>
                 </thead>
                 <tbody id="tabelaArtikala">
-                    <!-- JS ubacuje redove -->
                 </tbody>
             </table>
         </div>
@@ -82,6 +82,11 @@ html
         const readerDiv = document.getElementById("reader");
         const btnKamera = document.getElementById("btnKamera");
 
+        if (typeof Html5Qrcode === "undefined") {
+            alert("Biblioteka za kameru još nije učitana. Proverite internet vezu i osvežite stranicu.");
+            return;
+        }
+
         if (html5Qrcode && html5Qrcode.isScanning) {
             ugasiKameru();
             return;
@@ -98,7 +103,8 @@ html
             {
                 fps: 10,
                 qrbox: function(width, height) {
-                    return { width: width * 0.7, height: height * 0.5 };
+                    let size = Math.min(width, height) * 0.7;
+                    return { width: size, height: size * 0.6 };
                 }
             },
             (decodedText) => {
@@ -119,7 +125,7 @@ html
             },
             (errorMessage) => {}
         ).catch(err => {
-            alert("Greška pri pokretanju kamere: " + err);
+            alert("Greška pri pokretanju kamere: " + err + "\n\nProverite da li ste dozvolili pristup kameri u pretraživaču.");
             ugasiKameru();
         });
     }
@@ -146,7 +152,7 @@ html
         let sifra = document.getElementById("sifra").value.trim();
         let kolicina = parseInt(document.getElementById("kolicina").value);
 
-        if (!sifra || kolicina < 1) return; 
+        if (!sifra || isNaN(kolicina) || kolicina < 1) return; 
 
         let postojeci = artikli.find(a => a.sifra === sifra);
         if (postojeci) {
@@ -219,129 +225,43 @@ html
             alert("Lista je prazna!");
             return;
         }
-        let blob = new Blob([tekst], { type: "text/plain;charset=utf-8" });
-        let link = document.createElement("a");
+        const blob = new Blob([tekst], { type: "text/plain;charset=utf-8" });
+        const link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
         link.download = "inventura.txt";
         link.click();
     }
 
     function obrisiSve() {
-        if (confirm("Jeste li sigurni da želite obrisati sve skenirane artikle sa telefona?")) {
+        if (confirm("Da li ste sigurni da želite obrisati sve artikle sa telefona?")) {
             artikli = [];
             localStorage.removeItem("inventura_artikli");
             prikaziArtikale();
         }
     }
 
-    // Slanje na C:\SERVER\inventura.txt preko http://10.53.98.10:3000
-    function posaljiNaServer() {
+    async function posaljiNaServer() {
         let tekst = generisiTekstInventure();
         if (!tekst) {
             alert("Lista je prazna, nema šta da se pošalje!");
             return;
         }
 
-        fetch(`${SERVER_URL}/snimi`, {
-            method: "POST",
-            headers: { "Content-Type": "text/plain;charset=utf-8" },
-            body: tekst
-        })
-        .then(res => {
-            if (!res.ok) throw new Error("Server je vratio grešku.");
-            return res.text();
-        })
-        .then(odgovor => {
-            alert("✅ " + odgovor);
-        })
-        .catch(err => {
-            alert("❌ Greška pri slanju na server (" + SERVER_URL + ").\nProvjerite da li je server pokrenut na računaru!\n\n" + err);
-        });
+        try {
+            const response = await fetch(`${SERVER_URL}/snimi`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ podaci: tekst })
+            });
+
+            if (response.ok) {
+                alert("✅ Inventura je uspešno poslata na server!");
+            } else {
+                alert("❌ Greška na serveru: " + response.statusText);
+            }
+        } catch (error) {
+            alert("❌ Ne mogu da se povežem sa serverom (" + SERVER_URL + ").\n\nNapomena: Ako otvarate sajt preko HTTPS (GitHub), pretraživač blokira slanje na lokalni HTTP server.");
+        }
     }
 
-    // Otvara ili preuzima inventura.txt direktno sa C:\SERVER
     function otvoriSaServera() {
-        window.open(`${SERVER_URL}/inventura.txt`, "_blank");
-    }
-</script>
-</body>
-</html>
-Будите опрезни када користите кôд.
-
-2. Server za računar (C:\SERVER\server.py na portu 3000)
-
-Pošto već koristiš port 3000 (vjerovatno preko Node.js http-server ili Live Server ili Pythona), umjesto običnog statičkog servera pokreni ovu skriptu u C:\SERVER\server.py (ugasi prethodni server na portu 3000 prije pokretanja ovoga).
-Ona radi sve na jednom mjestu:
-• Kad na telefonu ili računaru otvoriš http://10.53.98.10:3000 -> otvara tvoj index.html.
-• Kad klikneš Pošalji inventuru na C:\SERVER -> snima podatke u C:\SERVER\inventura.txt.
-• Kad na računaru (ili telefonu) otvoriš http://10.53.98 -> odmah prikazuje ili preuzima taj fajl.
-python
-from http.server import HTTPServer, BaseHTTPRequestHandler
-import os
-
-FOLDER = r"C:\SERVER"
-os.makedirs(FOLDER, exist_ok=True)
-
-class ServerHandler(BaseHTTPRequestHandler):
-    def _cors(self):
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
-
-    def do_OPTIONS(self):
-        self.send_response(200)
-        self._cors()
-        self.end_headers()
-
-    def do_GET(self):
-        # Otvaranje same aplikacije (index.html)
-        if self.path == "/" or self.path == "/index.html":
-            putanja = os.path.join(FOLDER, "index.html")
-            if os.path.exists(putanja):
-                self.send_response(200)
-                self._cors()
-                self.send_header("Content-Type", "text/html; charset=utf-8")
-                self.end_headers()
-                with open(putanja, "rb") as f:
-                    self.wfile.write(f.read())
-            else:
-                self.send_error(404, "Nema index.html u C:\\SERVER")
-
-        # Pregled i preuzimanje inventura.txt sa bilo kog uredjaja
-        elif self.path == "/inventura.txt":
-            putanja = os.path.join(FOLDER, "inventura.txt")
-            if os.path.exists(putanja):
-                self.send_response(200)
-                self._cors()
-                self.send_header("Content-Type", "text/plain; charset=utf-8")
-                self.end_headers()
-                with open(putanja, "rb") as f:
-                    self.wfile.write(f.read())
-            else:
-                self.send_response(404)
-                self._cors()
-                self.send_header("Content-Type", "text/plain; charset=utf-8")
-                self.end_headers()
-                self.wfile.write("Fajl inventura.txt jos uvijek ne postoji.".encode("utf-8"))
-        else:
-            self.send_error(404)
-
-    def do_POST(self):
-        if self.path == "/snimi":
-            duzina = int(self.headers.get("Content-Length", 0))
-            podaci = self.rfile.read(duzina).decode("utf-8")
-            putanja = os.path.join(FOLDER, "inventura.txt")
-
-            with open(putanja, "w", encoding="utf-8") as f:
-                f.write(podaci)
-
-            print(f"[OK] Azuriran fajl: {putanja}")
-
-            self.send_response(200)
-            self._cors()
-            self.send_header("Content-Type", "text/plain; charset=utf-8")
-            self.end_headers()
-            self.wfile.write("Uspjesno snimljeno u C:\\SERVER\\inventura.txt!".encode("utf-8"))
-
-print("Server radi na http://10.53.98.10:3000 ...")
-HTTPServer(("0.0.0.0", 3000), ServerHandler).serve_forever()
