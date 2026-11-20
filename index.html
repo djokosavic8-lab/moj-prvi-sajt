@@ -5,8 +5,7 @@ html
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inventura JS</title>
-    <!-- ISPRAVLJEN LINK KA BIBLIOTECI ZA SKENER -->
-    <script src="https://unpkg.com" type="text/javascript"></script>
+    <script src="https://unpkg.com"></script>
     <style>
         body { font-family: Arial, sans-serif; margin: 15px; padding: 0; background: #f4f4f9; color: #333; }
         h2 { text-align: center; }
@@ -18,7 +17,8 @@ html
         button.server-file { background: #17a2b8; color: white; margin-top: 8px; }
         button.edit { background: #ffc107; color: #212529; padding: 6px 10px; font-size: 14px; width: auto; margin-top: 0; }
         input { width: 94%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; }
-        #reader { width: 100%; border-radius: 8px; overflow: hidden; margin-top: 10px; background: #eee; }
+        #reader { width: 100%; border-radius: 8px; overflow: hidden; margin-top: 10px; background: #000; }
+        #statusKamere { background: #fff3cd; color: #856404; padding: 10px; border-radius: 5px; margin-top: 10px; font-size: 14px; border: 1px solid #ffeeba; display: none; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
         th { background: #f2f2f2; }
@@ -26,12 +26,13 @@ html
 </head>
 <body>
 
-    <h2>📦 Mobilna gio*Djokosavic Inventura 2026</h2>
+    <h2>📦 Mobilna Gio#Djokosavic Inventura 2026</h2>
 
     <!-- Kamera Skener -->
     <div class="box">
         <h3>1. Skeniranje / Unos</h3>
-        <div id="reader" style="display: none; min-height: 250px;"></div>
+        <div id="statusKamere"></div>
+        <div id="reader" style="display: none;"></div>
         <button id="btnKamera" onclick="pokreniKameru()">📷 Upali kameru za Bar-kod</button>
         
         <p>
@@ -78,12 +79,34 @@ html
     let html5Qrcode = null;
     let mozeSkenirati = true;
 
+    function prikaziStatus(poruka, jeGreska = true) {
+        const statusDiv = document.getElementById("statusKamere");
+        statusDiv.style.display = "block";
+        statusDiv.style.background = jeGreska ? "#f8d7da" : "#d4edda";
+        statusDiv.style.color = jeGreska ? "#721c24" : "#155724";
+        statusDiv.style.borderColor = jeGreska ? "#f5c6cb" : "#c3e6cb";
+        statusDiv.innerHTML = poruka;
+    }
+
     function pokreniKameru() {
         const readerDiv = document.getElementById("reader");
         const btnKamera = document.getElementById("btnKamera");
 
+        // 1. Provjera da li je sajt na HTTPS ili localhost
+        if (!window.isSecureContext) {
+            prikaziStatus("<b>BLOKIRANO OD STRANE TELEFONA:</b> Otvarate sajt preko nezaštićene veze (<b>" + window.location.protocol + "</b>). Telefon dozvoljava kameru SAMO preko <b>https://</b> adrese!");
+            return;
+        }
+
+        // 2. Provjera da li pregledač uopšte podržava kameru
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            prikaziStatus("<b>GREŠKA PREGLEDAČA:</b> Vaš pregledač ne podržava pristup kameri. Otvorite stranicu u <b>Google Chrome</b> aplikaciji.");
+            return;
+        }
+
+        // 3. Provjera da li je skripta učitana
         if (typeof Html5Qrcode === "undefined") {
-            alert("Biblioteka za kameru još nije učitana. Proverite internet vezu i osvežite stranicu.");
+            prikaziStatus("<b>GREŠKA SA INTERNETOM:</b> Skripta za skener se nije učitala. Provjerite da li telefon ima internet.");
             return;
         }
 
@@ -92,6 +115,7 @@ html
             return;
         }
 
+        prikaziStatus("Pokrećem kameru, molimo sačekajte i kliknite <b>Dozvoli (Allow)</b> ako vas telefon pita...", false);
         readerDiv.style.display = "block";
         btnKamera.innerText = "🛑 Ugasi kameru";
         btnKamera.style.background = "#6c757d";
@@ -102,21 +126,16 @@ html
             { facingMode: "environment" }, 
             {
                 fps: 10,
-                qrbox: function(width, height) {
-                    let size = Math.min(width, height) * 0.7;
-                    return { width: size, height: size * 0.6 };
-                }
+                qrbox: { width: 250, height: 150 }
             },
             (decodedText) => {
                 if (!mozeSkenirati) return; 
                 mozeSkenirati = false; 
                 
                 document.getElementById("sifra").value = decodedText;
-                
                 if (window.navigator && window.navigator.vibrate) {
                     window.navigator.vibrate(100);
                 }
-                
                 dodajArtikal();
 
                 setTimeout(() => {
@@ -124,8 +143,10 @@ html
                 }, 1500); 
             },
             (errorMessage) => {}
-        ).catch(err => {
-            alert("Greška pri pokretanju kamere: " + err + "\n\nProverite da li ste dozvolili pristup kameri u pretraživaču.");
+        ).then(() => {
+            document.getElementById("statusKamere").style.display = "none";
+        }).catch(err => {
+            prikaziStatus("<b>GREŠKA KAMERE:</b> " + err);
             ugasiKameru();
         });
     }
@@ -227,41 +248,3 @@ html
         }
         const blob = new Blob([tekst], { type: "text/plain;charset=utf-8" });
         const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.download = "inventura.txt";
-        link.click();
-    }
-
-    function obrisiSve() {
-        if (confirm("Da li ste sigurni da želite obrisati sve artikle sa telefona?")) {
-            artikli = [];
-            localStorage.removeItem("inventura_artikli");
-            prikaziArtikale();
-        }
-    }
-
-    async function posaljiNaServer() {
-        let tekst = generisiTekstInventure();
-        if (!tekst) {
-            alert("Lista je prazna, nema šta da se pošalje!");
-            return;
-        }
-
-        try {
-            const response = await fetch(`${SERVER_URL}/snimi`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ podaci: tekst })
-            });
-
-            if (response.ok) {
-                alert("✅ Inventura je uspešno poslata na server!");
-            } else {
-                alert("❌ Greška na serveru: " + response.statusText);
-            }
-        } catch (error) {
-            alert("❌ Ne mogu da se povežem sa serverom (" + SERVER_URL + ").\n\nNapomena: Ako otvarate sajt preko HTTPS (GitHub), pretraživač blokira slanje na lokalni HTTP server.");
-        }
-    }
-
-    function otvoriSaServera() {
