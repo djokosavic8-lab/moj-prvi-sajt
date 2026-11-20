@@ -5,7 +5,7 @@ html
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inventura JS</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+    <script src="https://cloudflare.com"></script>
     <style>
         body { font-family: Arial, sans-serif; margin: 15px; padding: 0; background: #f4f4f9; color: #333; }
         h2 { text-align: center; }
@@ -14,6 +14,7 @@ html
         button.delete { background: #dc3545; }
         button.download { background: #28a745; }
         button.drive { background: #ff5722; color: white; margin-top: 15px; }
+        button.server-file { background: #17a2b8; color: white; margin-top: 8px; }
         button.edit { background: #ffc107; color: #212529; padding: 6px 10px; font-size: 14px; width: auto; margin-top: 0; }
         input { width: 94%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; }
         #reader { width: 100%; border-radius: 8px; overflow: hidden; margin-top: 10px; background: #eee; }
@@ -49,12 +50,9 @@ html
         <button class="download" onclick="preuzmiCSV()">💾 Preuzmi lokalno na telefon (TXT)</button>
         <button class="delete" onclick="obrisiSve()">🗑️ Obriši sve sa telefona</button>
         
-        <!-- Ovdje je ubačeno dugme i skrivena forma za slanje na Google Drive -->
-        <form id="driveForma" action="https://formspree.io" method="POST" style="display:none;">
-            <textarea name="Sadržaj Inventure" id="formaSadrzaj"></textarea>
-            <input type="text" name="_subject" value="Nova Inventura 2026">
-        </form>
-        <button class="drive" onclick="posaljiNaGoogleDrive()">🚀 Pošalji inventuru direktno na Google Drive</button>
+        <!-- Slanje direktno na C:\SERVER\inventura.txt -->
+        <button class="drive" onclick="posaljiNaServer()">🚀 Pošalji inventuru na C:\SERVER</button>
+        <button class="server-file" onclick="otvoriSaServera()">📂 Otvori / Preuzmi inventura.txt sa servera</button>
         
         <div style="overflow-x:auto;">
             <table>
@@ -73,6 +71,7 @@ html
     </div>
 
 <script>
+    const SERVER_URL = "http://10.53.98.10:3000";
     let artikli = JSON.parse(localStorage.getItem("inventura_artikli")) || [];
     prikaziArtikale();
 
@@ -205,49 +204,144 @@ html
         });
     }
 
-    // Promijenjena funkcija: uklonjen naslov i dodat ';' kao separator
     function generisiTekstInventure() {
         if (artikli.length === 0) return "";
-        let tekst = ""; // Naslov je uspješno uklonjen odavde
+        let tekst = "";
         artikli.forEach(artikal => {
-            tekst += `${artikal.sifra};${artikal.kolicina}\n`; // Korišten ; umjesto ,
+            tekst += `${artikal.sifra};${artikal.kolicina}\r\n`;
         });
         return tekst;
     }
 
     function preuzmiCSV() {
-        let sadrzaj = generisiTekstInventure();
-        if (!sadrzaj) {
-            alert("Nema podataka za preuzimanje.");
+        let tekst = generisiTekstInventure();
+        if (!tekst) {
+            alert("Lista je prazna!");
             return;
         }
-        let blob = new Blob([sadrzaj], { type: "text/plain;charset=utf-8" });
+        let blob = new Blob([tekst], { type: "text/plain;charset=utf-8" });
         let link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
         link.download = "inventura.txt";
         link.click();
     }
 
-    function posaljiNaGoogleDrive() {
-        let sadrzaj = generisiTekstInventure();
-        if (!sadrzaj) {
-            alert("Nema podataka za slanje.");
-            return;
-        }
-        document.getElementById("formaSadrzaj").value = sadrzaj;
-        alert("Pokrećem slanje na Google Drive (preko Formspree)...");
-        document.getElementById("driveForma").submit();
-    }
-
     function obrisiSve() {
-        if (confirm("Jeste li sigurni da želite obrisati SVE artikle sa ovog telefona? Ovo se ne može vratiti.")) {
+        if (confirm("Jeste li sigurni da želite obrisati sve skenirane artikle sa telefona?")) {
             artikli = [];
             localStorage.removeItem("inventura_artikli");
             prikaziArtikale();
-            alert("Svi podaci su obrisani lokalno.");
         }
     }
-</script>
 
+    // Slanje na C:\SERVER\inventura.txt preko http://10.53.98.10:3000
+    function posaljiNaServer() {
+        let tekst = generisiTekstInventure();
+        if (!tekst) {
+            alert("Lista je prazna, nema šta da se pošalje!");
+            return;
+        }
+
+        fetch(`${SERVER_URL}/snimi`, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: tekst
+        })
+        .then(res => {
+            if (!res.ok) throw new Error("Server je vratio grešku.");
+            return res.text();
+        })
+        .then(odgovor => {
+            alert("✅ " + odgovor);
+        })
+        .catch(err => {
+            alert("❌ Greška pri slanju na server (" + SERVER_URL + ").\nProvjerite da li je server pokrenut na računaru!\n\n" + err);
+        });
+    }
+
+    // Otvara ili preuzima inventura.txt direktno sa C:\SERVER
+    function otvoriSaServera() {
+        window.open(`${SERVER_URL}/inventura.txt`, "_blank");
+    }
+</script>
 </body>
 </html>
+Будите опрезни када користите кôд.
+
+2. Server za računar (C:\SERVER\server.py na portu 3000)
+
+Pošto već koristiš port 3000 (vjerovatno preko Node.js http-server ili Live Server ili Pythona), umjesto običnog statičkog servera pokreni ovu skriptu u C:\SERVER\server.py (ugasi prethodni server na portu 3000 prije pokretanja ovoga).
+Ona radi sve na jednom mjestu:
+• Kad na telefonu ili računaru otvoriš http://10.53.98.10:3000 -> otvara tvoj index.html.
+• Kad klikneš Pošalji inventuru na C:\SERVER -> snima podatke u C:\SERVER\inventura.txt.
+• Kad na računaru (ili telefonu) otvoriš http://10.53.98 -> odmah prikazuje ili preuzima taj fajl.
+python
+from http.server import HTTPServer, BaseHTTPRequestHandler
+import os
+
+FOLDER = r"C:\SERVER"
+os.makedirs(FOLDER, exist_ok=True)
+
+class ServerHandler(BaseHTTPRequestHandler):
+    def _cors(self):
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self._cors()
+        self.end_headers()
+
+    def do_GET(self):
+        # Otvaranje same aplikacije (index.html)
+        if self.path == "/" or self.path == "/index.html":
+            putanja = os.path.join(FOLDER, "index.html")
+            if os.path.exists(putanja):
+                self.send_response(200)
+                self._cors()
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.end_headers()
+                with open(putanja, "rb") as f:
+                    self.wfile.write(f.read())
+            else:
+                self.send_error(404, "Nema index.html u C:\\SERVER")
+
+        # Pregled i preuzimanje inventura.txt sa bilo kog uredjaja
+        elif self.path == "/inventura.txt":
+            putanja = os.path.join(FOLDER, "inventura.txt")
+            if os.path.exists(putanja):
+                self.send_response(200)
+                self._cors()
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
+                self.end_headers()
+                with open(putanja, "rb") as f:
+                    self.wfile.write(f.read())
+            else:
+                self.send_response(404)
+                self._cors()
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
+                self.end_headers()
+                self.wfile.write("Fajl inventura.txt jos uvijek ne postoji.".encode("utf-8"))
+        else:
+            self.send_error(404)
+
+    def do_POST(self):
+        if self.path == "/snimi":
+            duzina = int(self.headers.get("Content-Length", 0))
+            podaci = self.rfile.read(duzina).decode("utf-8")
+            putanja = os.path.join(FOLDER, "inventura.txt")
+
+            with open(putanja, "w", encoding="utf-8") as f:
+                f.write(podaci)
+
+            print(f"[OK] Azuriran fajl: {putanja}")
+
+            self.send_response(200)
+            self._cors()
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.end_headers()
+            self.wfile.write("Uspjesno snimljeno u C:\\SERVER\\inventura.txt!".encode("utf-8"))
+
+print("Server radi na http://10.53.98.10:3000 ...")
+HTTPServer(("0.0.0.0", 3000), ServerHandler).serve_forever()
