@@ -24,7 +24,7 @@ html
 </head>
 <body>
 
-    <h2>📦 Mobilna GIO*Djokosavic Inventura 2026</h2>
+    <h2>📦 Mobilna Djokosavic Inventura 2026</h2>
 
     <!-- Kamera Skener -->
     <div class="box">
@@ -143,8 +143,6 @@ html
         }
     }
 
- const SERVER_URL = "http://10.53.98"; // Provjeri da li je ruta /inventura ili samo /
-
     function dodajArtikal() {
         let sifra = document.getElementById("sifra").value.trim();
         let kolicina = parseInt(document.getElementById("kolicina").value);
@@ -161,72 +159,93 @@ html
         localStorage.setItem("inventura_artikli", JSON.stringify(artikli));
         prikaziArtikale();
 
-        // Automatsko tiho slanje u pozadini na laptop dok kamera i dalje radi
-        posaljiPodatkeTiho(sifra, kolicina);
-
         document.getElementById("sifra").value = "";
         document.getElementById("kolicina").value = "1";
     }
 
-    function posaljiPodatkeTiho(sifra, kolicina) {
-        const statusDiv = document.getElementById("statusSlanja");
-        fetch(SERVER_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                sifra: sifra,
-                kolicina: kolicina,
-                tekst: `${sifra};${kolicina}\n`,
-                sviArtikli: artikli
-            })
-        })
-        .then(odgovor => {
-            if (odgovor.ok) {
-                statusDiv.style.color = "#28a745";
-                statusDiv.innerText = `✅ Poslano na laptop: ${sifra} (${kolicina} kom)`;
-            } else {
-                statusDiv.style.color = "#dc3545";
-                statusDiv.innerText = `⚠️ Server greška: ${odgovor.status}`;
+    function izmjeniKolicinu(sifraArtikla) {
+        let artikal = artikli.find(a => a.sifra === sifraArtikla);
+        if (artikal) {
+            let novaKolicina = prompt(`Unesite novu količinu za artikal ${sifraArtikla}:`, artikal.kolicina);
+            if (novaKolicina === null) return; 
+            
+            let uneseniBroj = parseInt(novaKolicina);
+            if (isNaN(uneseniBroj) || uneseniBroj < 0) {
+                alert("Molimo unesite ispravan broj (0 ili veći).");
+                return;
             }
-        })
-        .catch(greska => {
-            statusDiv.style.color = "#dc3545";
-            statusDiv.innerText = "❌ Nema veze sa serverom (sačuvano na telefonu)";
+
+            if (uneseniBroj === 0) {
+                if (confirm("Količina je 0. Želite li ukloniti ovaj artikal iz inventure?")) {
+                    artikli = artikli.filter(a => a.sifra !== sifraArtikla);
+                } else {
+                    return;
+                }
+            } else {
+                artikal.kolicina = uneseniBroj;
+            }
+
+            localStorage.setItem("inventura_artikli", JSON.stringify(artikli));
+            prikaziArtikale();
+        }
+    }
+
+    function prikaziArtikale() {
+        let tbody = document.getElementById("tabelaArtikala");
+        tbody.innerHTML = "";
+        
+        artikli.forEach(artikal => {
+            let tr = document.createElement("tr");
+            tr.innerHTML = `
+                <td>${artikal.sifra}</td>
+                <td>${artikal.kolicina}</td>
+                <td><button class="edit" onclick="izmjeniKolicinu('${artikal.sifra}')">✏️ Izmjeni</button></td>
+            `;
+            tbody.appendChild(tr);
         });
     }
 
-    function posaljiNaServer() {
+    // Promijenjena funkcija: uklonjen naslov i dodat ';' kao separator
+    function generisiTekstInventure() {
+        if (artikli.length === 0) return "";
+        let tekst = ""; // Naslov je uspješno uklonjen odavde
+        artikli.forEach(artikal => {
+            tekst += `${artikal.sifra};${artikal.kolicina}\n`; // Korišten ; umjesto ,
+        });
+        return tekst;
+    }
+
+    function preuzmiCSV() {
+        let sadrzaj = generisiTekstInventure();
+        if (!sadrzaj) {
+            alert("Nema podataka za preuzimanje.");
+            return;
+        }
+        let blob = new Blob([sadrzaj], { type: "text/plain;charset=utf-8" });
+        let link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = "inventura.txt";
+        link.click();
+    }
+
+    function posaljiNaGoogleDrive() {
         let sadrzaj = generisiTekstInventure();
         if (!sadrzaj) {
             alert("Nema podataka za slanje.");
             return;
         }
+        document.getElementById("formaSadrzaj").value = sadrzaj;
+        alert("Pokrećem slanje na Google Drive (preko Formspree)...");
+        document.getElementById("driveForma").submit();
+    }
 
-        const statusDiv = document.getElementById("statusSlanja");
-        statusDiv.style.color = "#007bff";
-        statusDiv.innerText = "⏳ Šaljem kompletnu listu na laptop...";
-
-        fetch(SERVER_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                tekst: sadrzaj,
-                sviArtikli: artikli
-            })
-        })
-        .then(odgovor => {
-            if (odgovor.ok) {
-                statusDiv.style.color = "#28a745";
-                statusDiv.innerText = "✅ Kompletna inventura uspješno prebačena na laptop!";
-            } else {
-                statusDiv.style.color = "#dc3545";
-                statusDiv.innerText = `⚠️ Greška sa servera: ${odgovor.status}`;
-            }
-        })
-        .catch(err => {
-            statusDiv.style.color = "#dc3545";
-            statusDiv.innerText = "❌ Greška u povezivanju sa serverom 10.53.98.10:3000";
-        });
+    function obrisiSve() {
+        if (confirm("Jeste li sigurni da želite obrisati SVE artikle sa ovog telefona? Ovo se ne može vratiti.")) {
+            artikli = [];
+            localStorage.removeItem("inventura_artikli");
+            prikaziArtikale();
+            alert("Svi podaci su obrisani lokalno.");
+        }
     }
 </script>
 
