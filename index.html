@@ -9,12 +9,11 @@ html
         body { font-family: Arial, sans-serif; margin: 15px; background: #f4f4f9; color: #333; }
         h2 { text-align: center; }
         .box { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 15px; }
-        button { width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 5px; font-size: 16px; font-weight: bold; margin-top: 8px; }
+        button { width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 5px; font-size: 16px; font-weight: bold; margin-top: 8px; cursor: pointer; }
         button:disabled { background: #999; }
         button.delete { background: #dc3545; }
         button.download { background: #28a745; }
-        button.drive { background: #ff5722; margin-top: 15px; }
-        button.server-file { background: #17a2b8; }
+        button.share { background: #ff5722; margin-top: 12px; }
         button.edit { background: #ffc107; color: #000; padding: 6px 10px; font-size: 14px; width: auto; margin-top: 0; }
         input { width: 94%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; }
         video { width: 100%; max-height: 260px; background: #000; border-radius: 8px; margin-top: 10px; display: none; object-fit: cover; }
@@ -26,7 +25,7 @@ html
 </head>
 <body>
 
-    <h2>📦 Mobilna 19573103G#Djoko Inventura 2026</h2>
+    <h2>📦 Mobilna 1957G#Djokosavic Inventura 2026</h2>
 
     <div class="box">
         <h3>1. Skeniranje / Unos</h3>
@@ -40,11 +39,10 @@ html
     </div>
 
     <div class="box">
-        <h3>2. Zadržani artikli na telefonu</h3>
+        <h3>2. Zadržani artikli na telefonu (<span id="ukupnoStavki">0</span>)</h3>
+        <button class="share" id="btnPodijeli" type="button">📤 Pošalji inventura.txt (Viber / Mail)</button>
         <button class="download" id="btnPreuzmi" type="button">💾 Preuzmi lokalno na telefon (TXT)</button>
         <button class="delete" id="btnObrisi" type="button">🗑️ Obriši sve sa telefona</button>
-        <button class="drive" id="btnServer" type="button">🚀 Pošalji inventuru na C:\SERVER</button>
-        <button class="server-file" id="btnOtvoriServer" type="button">📂 Otvori / Preuzmi inventura.txt sa servera</button>
         
         <table>
             <thead><tr><th>Šifra</th><th>Kol.</th><th>Akcija</th></tr></thead>
@@ -53,7 +51,6 @@ html
     </div>
 
 <script>
-    const SERVER_URL = "http://192.168.1.141:3000";   
     let artikli = JSON.parse(localStorage.getItem("inventura_artikli")) || [];
     let stream = null, aktivno = false, pauza = false;
     const video = document.getElementById("video");
@@ -79,10 +76,7 @@ html
         btnKamera.innerText = "⏳ Palim kameru...";
 
         try {
-            if (stream) {
-                stream.getTracks().forEach(t => t.stop());
-            }
-
+            if (stream) stream.getTracks().forEach(t => t.stop());
             stream = await navigator.mediaDevices.getUserMedia({
                 video: { facingMode: "environment" },
                 audio: false
@@ -170,33 +164,53 @@ html
 
     function prikazi() {
         let tb = document.getElementById("tabelaArtikala");
+        document.getElementById("ukupnoStavki").innerText = artikli.length;
         tb.innerHTML = "";
         artikli.forEach(a => {
             tb.innerHTML += `<tr><td>${a.sifra}</td><td>${a.kolicina}</td><td><button class="edit" onclick="izmjeni('${a.sifra}')">✏️</button></td></tr>`;
         });
     }
 
+    function napraviTekst() {
+        return artikli.map(a => `${a.sifra};${a.kolicina}`).join("\r\n");
+    }
+
     document.getElementById("btnDodaj").onclick = dodajArtikal;
+
     document.getElementById("btnPreuzmi").onclick = () => {
-        let txt = artikli.map(a => `${a.sifra};${a.kolicina}`).join("\r\n");
+        let txt = napraviTekst();
         if (!txt) return alert("Lista je prazna!");
         let l = document.createElement("a");
         l.href = URL.createObjectURL(new Blob([txt], { type: "text/plain" }));
         l.download = "inventura.txt";
         l.click();
     };
-    document.getElementById("btnObrisi").onclick = () => {
-        if (confirm("Obrisati sve?")) { artikli = []; localStorage.removeItem("inventura_artikli"); prikazi(); }
-    };
-    document.getElementById("btnServer").onclick = async () => {
-        let txt = artikli.map(a => `${a.sifra};${a.kolicina}`).join("\r\n");
+
+    document.getElementById("btnPodijeli").onclick = async () => {
+        let txt = napraviTekst();
         if (!txt) return alert("Lista je prazna!");
-        try {
-            let r = await fetch(`${SERVER_URL}/snimi`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ podaci: txt }) });
-            alert(r.ok ? "✅ Poslato!" : "❌ Greška: " + r.statusText);
-        } catch (e) { alert("❌ Nema veze sa serverom (" + SERVER_URL + ")"); }
+        let fajl = new File([txt], "inventura.txt", { type: "text/plain" });
+        
+        if (navigator.canShare && navigator.canShare({ files: [fajl] })) {
+            try {
+                await navigator.share({
+                    files: [fajl],
+                    title: "Inventura",
+                    text: "Fajl inventure (inventura.txt)"
+                });
+            } catch (e) {}
+        } else {
+            alert("Vaš pretraživač ne podržava direktno dijeljenje fajla, kliknite na zeleno dugme za preuzimanje.");
+        }
     };
-    document.getElementById("btnOtvoriServer").onclick = () => window.open(`${SERVER_URL}/inventura.txt`, "_blank");
+
+    document.getElementById("btnObrisi").onclick = () => {
+        if (confirm("Da li ste sigurni da želite obrisati sve artikle sa telefona?")) {
+            artikli = [];
+            localStorage.removeItem("inventura_artikli");
+            prikazi();
+        }
+    };
 
     prikazi();
 </script>
