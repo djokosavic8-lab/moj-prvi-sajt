@@ -9,465 +9,8 @@ html
         body { font-family: Arial, sans-serif; margin: 15px; background: #f4f4f9; color: #333; }
         h2 { text-align: center; }
         .box { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 15px; }
-        button { width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 5px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 8px; }
-        button.delete { background: #dc3545; }
-        button.download { background: #28a745; }
-        button.drive { background: #ff5722; margin-top: 15px; }
-        button.server-file { background: #17a2b8; margin-top: 8px; }
-        button.edit { background: #ffc107; color: #212529; padding: 6px 10px; font-size: 14px; width: auto; margin-top: 0; }
-        input { width: 94%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; }
-        video { width: 100%; max-height: 280px; background: #000; border-radius: 8px; margin-top: 10px; display: none; object-fit: cover; }
-        #status { padding: 10px; margin-top: 10px; border-radius: 5px; font-size: 14px; display: none; background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-        th { background: #f2f2f2; }
-    </style>
-</head>
-<body>
-
-    <h2>📦 Mobilna Skraceno#Djokosavic Inventura 2026</h2>
-
-    <div class="box">
-        <h3>1. Skeniranje / Unos</h3>
-        <div id="status"></div>
-        <video id="video" playsinline autoplay muted></video>
-        <button id="btnKamera" type="button">📷 Upali kameru za Bar-kod</button>
-        
-        <p>
-            <label>Bar-kod ili Šifra:</label>
-            <input type="text" id="sifra" placeholder="Skenirajte ili upišite ručno">
-        </p>
-        <p>
-            <label>Količina:</label>
-            <input type="number" id="kolicina" value="1" min="1">
-        </p>
-        <button id="btnDodaj" type="button">➕ Upiši Artikal</button>
-    </div>
-
-    <div class="box">
-        <h3>2. Zadržani artikli na telefonu</h3>
-        <button class="download" id="btnPreuzmi" type="button">💾 Preuzmi lokalno na telefon (TXT)</button>
-        <button class="delete" id="btnObrisi" type="button">🗑️ Obriši sve sa telefona</button>
-        
-        <button class="drive" id="btnServer" type="button">🚀 Pošalji inventuru na C:\SERVER</button>
-        <button class="server-file" id="btnOtvoriServer" type="button">📂 Otvori / Preuzmi inventura.txt sa servera</button>
-        
-        <div style="overflow-x:auto;">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Šifra / Bar-kod</th>
-                        <th>Količina</th>
-                        <th>Akcija</th>
-                    </tr>
-                </thead>
-                <tbody id="tabelaArtikala"></tbody>
-            </table>
-        </div>
-    </div>
-
-<script>
-    const SERVER_URL = "http://10.53.98.10:3000";
-    let artikli = JSON.parse(localStorage.getItem("inventura_artikli")) || [];
-    let stream = null;
-    let skeniranjeAktivno = false;
-    let pauzaSkeniranja = false;
-
-    const video = document.getElementById("video");
-    const btnKamera = document.getElementById("btnKamera");
-    const statusDiv = document.getElementById("status");
-
-    function prikaziPoruku(tekst) {
-        statusDiv.style.display = "block";
-        statusDiv.innerHTML = tekst;
-    }
-
-    btnKamera.addEventListener("click", async function() {
-        if (skeniranjeAktivno) {
-            ugasiKameru();
-            return;
-        }
-
-        statusDiv.style.display = "none";
-
-        if (!window.isSecureContext) {
-            prikaziPoruku("<b>GREŠKA ADRESE:</b> Stranica nije na HTTPS. Trenutna adresa: " + window.location.href);
-            return;
-        }
-
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            prikaziPoruku("<b>GREŠKA:</b> Pregledač ne podržava kameru. Koristite Google Chrome.");
-            return;
-        }
-
-        try {
-            stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: "environment" },
-                audio: false
-            });
-
-            video.srcObject = stream;
-            video.style.display = "block";
-            await video.play();
-
-            skeniranjeAktivno = true;
-            btnKamera.innerText = "🛑 Ugasi kameru";
-            btnKamera.style.background = "#6c757d";
-
-            pokreniCitacBarkoda();
-        } catch (err) {
-            prikaziPoruku("<b>KAMERA NIJE OTVORENA:</b> " + err.name + " - " + err.message);
-        }
-    });
-
-    function ugasiKameru() {
-        skeniranjeAktivno = false;
-        if (stream) {
-            stream.getTracks().forEach(track => track.stop());
-            stream = null;
-        }
-        video.style.display = "none";
-        btnKamera.innerText = "📷 Upali kameru za Bar-kod";
-        btnKamera.style.background = "#007bff";
-    }
-
-    async function pokreniCitacBarkoda() {
-        if (!("BarcodeDetector" in window)) {
-            prikaziPoruku("Kamera radi, ali vaš pregledač nema ugrađen čitač bar-kodova. Koristite Google Chrome na Androidu.");
-            return;
-        }
-
-        const detector = new BarcodeDetector();
-
-        async function petlja() {
-            if (!skeniranjeAktivno) return;
-
-            if (!pauzaSkeniranja && video.readyState === video.HAVE_ENOUGH_DATA) {
-                try {
-                    const kodovi = await detector.detect(video);
-                    if (kodovi.length > 0) {
-                        pauzaSkeniranja = true;
-                        document.getElementById("sifra").value = kodovi[0].rawValue;
-                        if (navigator.vibrate) navigator.vibrate(100);
-                        dodajArtikal();
-                        setTimeout(() => { pauzaSkeniranja = false; }, 1500);
-                    }
-                } catch (e) {}
-            }
-            requestAnimationFrame(petlja);
-        }
-        petlja();
-    }
-
-    function dodajArtikal() {
-        let sifra = document.getElementById("sifra").value.trim();
-        let kolicina = parseInt(document.getElementById("kolicina").value);
-        if (!sifra || isNaN(kolicina) || kolicina < 1) return;
-
-        let postojeci = artikli.find(a => a.sifra === sifra);
-        if (postojeci) {
-            postojeci.kolicina += kolicina;
-        } else {
-            artikli.push({ sifra: sifra, kolicina: kolicina });
-        }
-
-        localStorage.setItem("inventura_artikli", JSON.stringify(artikli));
-        prikaziArtikale();
-        document.getElementById("sifra").value = "";
-        document.getElementById("kolicina").value = "1";
-    }
-
-    function izmjeniKolicinu(sifraArtikla) {
-        let artikal = artikli.find(a => a.sifra === sifraArtikla);
-        if (!artikal) return;
-        let nova = prompt("Nova količina za " + sifraArtikla + ":", artikal.kolicina);
-        if (nova === null) return;
-        let broj = parseInt(nova);
-        if (isNaN(broj) || broj < 0) return;
-
-        if (broj === 0) {
-            artikli = artikli.filter(a => a.sifra !== sifraArtikla);
-        } else {
-            artikal.kolicina = broj;
-        }
-        localStorage.setItem("inventura_artikli", JSON.stringify(artikli));
-        prikaziArtikale();
-    }
-
-    function prikaziArtikale() {
-        let tbody = document.getElementById("tabelaArtikala");
-        tbody.innerHTML = "";
-        artikli.forEach(a => {
-            let tr = document.createElement("tr");
-            tr.innerHTML = `<td>${a.sifra}</td><td>${a.kolicina}</td><td><button class="edit" onclick="izmjeniKolicinu('${a.sifra}')">✏️ Izmjeni</button></td>`;
-            tbody.appendChild(tr);
-        });
-    }
-
-    function generisiTekst() {
-        return artikli.map(a => `${a.sifra};${a.kolicina}`).join("\r\n");
-    }
-
-    document.getElementById("btnDodaj").addEventListener("click", dodajArtikal);
-
-    document.getElementById("btnPreuzmi").addEventListener("click", function() {
-        let tekst = generisiTekst();
-        if (!tekst) return alert("Lista je prazna!");
-        const blob = new Blob([tekst], { type: "text/plain;charset=utf-8" });
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.download = "inventura.txt";
-        link.click();
-    });
-
-    document.getElementById("btnObrisi").addEventListener("click", function() {
-        if (confirm("Obrisati sve sa telefona?")) {
-            artikli = [];
-            localStorage.removeItem("inventura_artikli");
-            prikaziArtikale();
-        }
-    });
-
-    document.getElementById("btnServer").addEventListener("click", async function() {
-        let tekst = generisiTekst();
-        if (!tekst) return alert("Lista je prazna!");
-        try {
-            const res = await fetch(`${SERVER_URL}/snimi`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ podaci: tekst })
-            });
-            if (res.ok) alert("✅ Poslato na server!");
-            else alert("❌ Greška servera: " + res.statusText);
-        } catch (e) {
-            alert("❌ Nema veze sa serverom (" + SERVER_URL + ").");
-        }
-    });
-
-    document.getElementById("btnOtvoriServer").addEventListener("click", function() {
-        window.open(`${SERVER_URL}/inventura.txt`, "_blank");
-    });
-
-    prikaziArtikale();
-</script>
-</body>
-</html>
-Будите опрезни када користите кôд.
-Ako ti i nakon ovoga kamera ne radi, pošalji mi sliku ekrana (screenshot) tvog telefona nakon što klikneš dugme za kameru, da vidim kako izgleda ekran i šta piše u adresnoj liniji na vrhu.
-
-html
-<!DOCTYPE html>
-<html lang="hr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inventura JS</title>
-    <script src="https://unpkg.com"></script>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 15px; padding: 0; background: #f4f4f9; color: #333; }
-        h2 { text-align: center; }
-        .box { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 15px; }
-        button { width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 5px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 8px; }
-        button.delete { background: #dc3545; }
-        button.download { background: #28a745; }
-        button.drive { background: #ff5722; color: white; margin-top: 15px; }
-        button.server-file { background: #17a2b8; color: white; margin-top: 8px; }
-        button.edit { background: #ffc107; color: #212529; padding: 6px 10px; font-size: 14px; width: auto; margin-top: 0; }
-        input { width: 94%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; }
-        #reader { width: 100%; border-radius: 8px; overflow: hidden; margin-top: 10px; background: #000; }
-        #statusKamere { background: #fff3cd; color: #856404; padding: 10px; border-radius: 5px; margin-top: 10px; font-size: 14px; border: 1px solid #ffeeba; display: none; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-        th { background: #f2f2f2; }
-    </style>
-</head>
-<body>
-
-    <h2>📦 Mobilna Gio#Djokosavic Inventura 2026</h2>
-
-    <!-- Kamera Skener -->
-    <div class="box">
-        <h3>1. Skeniranje / Unos</h3>
-        <div id="statusKamere"></div>
-        <div id="reader" style="display: none;"></div>
-        <button id="btnKamera" onclick="pokreniKameru()">📷 Upali kameru za Bar-kod</button>
-        
-        <p>
-            <label>Bar-kod ili Šifra:</label>
-            <input type="text" id="sifra" placeholder="Skenirajte ili upišite ručno">
-        </p>
-        <p>
-            <label>Količina:</label>
-            <input type="number" id="kolicina" value="1" min="1">
-        </p>
-        <button onclick="dodajArtikal()">➕ Upiši Artikal</button>
-    </div>
-
-    <!-- Lista artikala u memoriji -->
-    <div class="box">
-        <h3>2. Zadržani artikli na telefonu</h3>
-        <button class="download" onclick="preuzmiCSV()">💾 Preuzmi lokalno na telefon (TXT)</button>
-        <button class="delete" onclick="obrisiSve()">🗑️ Obriši sve sa telefona</button>
-        
-        <!-- Slanje direktno na C:\SERVER\inventura.txt -->
-        <button class="drive" onclick="posaljiNaServer()">🚀 Pošalji inventuru na C:\SERVER</button>
-        <button class="server-file" onclick="otvoriSaServera()">📂 Otvori / Preuzmi inventura.txt sa servera</button>
-        
-        <div style="overflow-x:auto;">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Šifra / Bar-kod</th>
-                        <th>Količina</th>
-                        <th>Akcija</th>
-                    </tr>
-                </thead>
-                <tbody id="tabelaArtikala">
-                </tbody>
-            </table>
-        </div>
-    </div>
-
-<script>
-    const SERVER_URL = "http://10.53.98.10:3000";
-    let artikli = JSON.parse(localStorage.getItem("inventura_artikli")) || [];
-    prikaziArtikale();
-
-    let html5Qrcode = null;
-    let mozeSkenirati = true;
-
-    function prikaziStatus(poruka, jeGreska = true) {
-        const statusDiv = document.getElementById("statusKamere");
-        statusDiv.style.display = "block";
-        statusDiv.style.background = jeGreska ? "#f8d7da" : "#d4edda";
-        statusDiv.style.color = jeGreska ? "#721c24" : "#155724";
-        statusDiv.style.borderColor = jeGreska ? "#f5c6cb" : "#c3e6cb";
-        statusDiv.innerHTML = poruka;
-    }
-
-    function pokreniKameru() {
-        const readerDiv = document.getElementById("reader");
-        const btnKamera = document.getElementById("btnKamera");
-
-        // 1. Provjera da li je sajt na HTTPS ili localhost
-        if (!window.isSecureContext) {
-            prikaziStatus("<b>BLOKIRANO OD STRANE TELEFONA:</b> Otvarate sajt preko nezaštićene veze (<b>" + window.location.protocol + "</b>). Telefon dozvoljava kameru SAMO preko <b>https://</b> adrese!");
-            return;
-        }
-
-        // 2. Provjera da li pregledač uopšte podržava kameru
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            prikaziStatus("<b>GREŠKA PREGLEDAČA:</b> Vaš pregledač ne podržava pristup kameri. Otvorite stranicu u <b>Google Chrome</b> aplikaciji.");
-            return;
-        }
-
-        // 3. Provjera da li je skripta učitana
-        if (typeof Html5Qrcode === "undefined") {
-            prikaziStatus("<b>GREŠKA SA INTERNETOM:</b> Skripta za skener se nije učitala. Provjerite da li telefon ima internet.");
-            return;
-        }
-
-        if (html5Qrcode && html5Qrcode.isScanning) {
-            ugasiKameru();
-            return;
-        }
-
-        prikaziStatus("Pokrećem kameru, molimo sačekajte i kliknite <b>Dozvoli (Allow)</b> ako vas telefon pita...", false);
-        readerDiv.style.display = "block";
-        btnKamera.innerText = "🛑 Ugasi kameru";
-        btnKamera.style.background = "#6c757d";
-
-        html5Qrcode = new Html5Qrcode("reader");
-        
-        html5Qrcode.start(
-            { facingMode: "environment" }, 
-            {
-                fps: 10,
-                qrbox: { width: 250, height: 150 }
-            },
-            (decodedText) => {
-                if (!mozeSkenirati) return; 
-                mozeSkenirati = false; 
-                
-                document.getElementById("sifra").value = decodedText;
-                if (window.navigator && window.navigator.vibrate) {
-                    window.navigator.vibrate(100);
-                }
-                dodajArtikal();
-
-                setTimeout(() => {
-                    mozeSkenirati = true;
-                }, 1500); 
-            },
-            (errorMessage) => {}
-        ).then(() => {
-            document.getElementById("statusKamere").style.display = "none";
-        }).catch(err => {
-            prikaziStatus("<b>GREŠKA KAMERE:</b> " + err);
-            ugasiKameru();
-        });
-    }
-
-    function ugasiKameru() {
-        const readerDiv = document.getElementById("reader");
-        const btnKamera = document.getElementById("btnKamera");
-        
-        if (html5Qrcode) {
-            html5Qrcode.stop().then(() => {
-                html5Qrcode.clear();
-                readerDiv.style.display = "none";
-                btnKamera.innerText = "📷 Upali kameru za Bar-kod";
-                btnKamera.style.background = "#007bff";
-            }).catch(err => {
-                readerDiv.style.display = "none";
-                btnKamera.innerText = "📷 Upali kameru za Bar-kod";
-                btnKamera.style.background = "#007bff";
-            });
-        }
-    }
-
-    function dodajArtikal() {
-        let sifra = document.getElementById("sifra").value.trim();
-        let kolicina = parseInt(document.getElementById("kolicina").value);
-
-        if (!sifra || isNaN(kolicina) || kolicina < 1) return; 
-
-        let postojeci = artikli.find(a => a.sifra === sifra);
-        if (postojeci) {
-            postojeci.kolicina += kolicina;
-        } else {
-            artikli.push({ sifra: sifra, kolicina: kolicina });
-        }
-
-        localStorage.setItem("inventura_artikli", JSON.stringify(artikli));
-        prikaziArtikale();
-
-        document.getElementById("sifra").value = "";
-        document.getElementById("kolicina").value = "1";
-    }
-
-    function izmjeniKolicinu(sifraArtikla) {
-        let artikal = artikli.find(a => a.sifra === sifraArtikla);
-        if (artikal) {
-            let novaKolicina = prompt(`Unesite novu količinu za artikal ${sifraArtikla}:`, artikal.kolicina);
-            if (novaKolicina === null) return; 
-            
-            let uneseniBroj =
-
-Sada vidim tačno šta se dešava! Tvoj telefon ili mreža automatski skraćuju svaki dugačak link kada ga kopiraš, pa ti u 7. liniji opet ostane samo <script src="https://unpkg.com"></script> bez nastavka za kameru. Takođe, tekst koji pošalješ u poruci se siječe na pola ako je predugačak.
-Zato ti sada šaljem kompletan kod bez ikakvih vanjskih linkova i dovoljno kratak da stane cijeli bez sječenja:
-html
-<!DOCTYPE html>
-<html lang="hr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inventura JS</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 15px; background: #f4f4f9; color: #333; }
-        h2 { text-align: center; }
-        .box { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 15px; }
         button { width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 5px; font-size: 16px; font-weight: bold; margin-top: 8px; }
+        button:disabled { background: #999; }
         button.delete { background: #dc3545; }
         button.download { background: #28a745; }
         button.drive { background: #ff5722; margin-top: 15px; }
@@ -483,7 +26,7 @@ html
 </head>
 <body>
 
-    <h2>📦 Mobilna Gio#Djokosavic Inventura 2026</h2>
+    <h2>📦 Mobilna Gio57#Djokosavic Inventura 2026</h2>
 
     <div class="box">
         <h3>1. Skeniranje / Unos</h3>
@@ -524,7 +67,7 @@ html
         statusDiv.style.display = "none";
 
         if (!window.isSecureContext) {
-            poruka("<b>BLOKIRANO:</b> Sajt mora biti otvoren preko <b>https://</b> adrese, a ne preko " + window.location.protocol);
+            poruka("<b>BLOKIRANO:</b> Sajt mora biti otvoren preko <b>https://</b> adrese.");
             return;
         }
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -532,37 +75,59 @@ html
             return;
         }
 
+        btnKamera.disabled = true;
+        btnKamera.innerText = "⏳ Palim kameru...";
+
         try {
-            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
-            video.srcObject = stream;
+            if (stream) {
+                stream.getTracks().forEach(t => t.stop());
+            }
+
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: "environment" },
+                audio: false
+            });
+
             video.style.display = "block";
-            await video.play();
-            aktivno = true;
-            btnKamera.innerText = "🛑 Ugasi kameru";
-            btnKamera.style.background = "#6c757d";
-            citajBarkod();
+            video.srcObject = stream;
+
+            video.onloadedmetadata = () => {
+                video.play().catch(() => {});
+                aktivno = true;
+                btnKamera.disabled = false;
+                btnKamera.innerText = "🛑 Ugasi kameru";
+                btnKamera.style.background = "#6c757d";
+                citajBarkod();
+            };
         } catch (err) {
+            btnKamera.disabled = false;
+            btnKamera.innerText = "📷 Upali kameru za Bar-kod";
             poruka("<b>GREŠKA KAMERE:</b> " + err.name + " - " + err.message);
         }
     };
 
     function ugasiKameru() {
         aktivno = false;
-        if (stream) stream.getTracks().forEach(t => t.stop());
+        if (stream) {
+            stream.getTracks().forEach(t => t.stop());
+            stream = null;
+        }
+        video.srcObject = null;
         video.style.display = "none";
+        btnKamera.disabled = false;
         btnKamera.innerText = "📷 Upali kameru za Bar-kod";
         btnKamera.style.background = "#007bff";
     }
 
     function citajBarkod() {
         if (!("BarcodeDetector" in window)) {
-            poruka("Kamera radi, ali ovaj telefon/pregledač nema ugrađen čitač bar-kodova.");
+            poruka("Kamera je upaljena, ali ovaj telefon nema ugrađen čitač bar-kodova.");
             return;
         }
         const detector = new BarcodeDetector();
         async function petlja() {
             if (!aktivno) return;
-            if (!pauza && video.readyState === video.HAVE_ENOUGH_DATA) {
+            if (!pauza && video.readyState >= 2) {
                 try {
                     const kodovi = await detector.detect(video);
                     if (kodovi.length > 0) {
