@@ -13,7 +13,7 @@ html
         button:disabled { background: #999; }
         button.delete { background: #dc3545; }
         button.download { background: #28a745; }
-        button.share { background: #ff5722; margin-top: 12px; }
+        button.share { background: #0078d4; margin-top: 12px; }
         button.edit { background: #ffc107; color: #000; padding: 6px 10px; font-size: 14px; width: auto; margin-top: 0; }
         input { width: 94%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; }
         video { width: 100%; max-height: 260px; background: #000; border-radius: 8px; margin-top: 10px; display: none; object-fit: cover; }
@@ -25,7 +25,7 @@ html
 </head>
 <body>
 
-    <h2>📦 Mobilna 1957G#Djokosavic Inventura 2026</h2>
+    <h2>📦 Mobilna Gioco***Savic Inventura 2026</h2>
 
     <div class="box">
         <h3>1. Skeniranje / Unos</h3>
@@ -40,7 +40,7 @@ html
 
     <div class="box">
         <h3>2. Zadržani artikli na telefonu (<span id="ukupnoStavki">0</span>)</h3>
-        <button class="share" id="btnPodijeli" type="button">📤 Pošalji inventura.txt (Viber / Mail)</button>
+        <button class="share" id="btnPodijeli" type="button">☁️ Pošalji na OneDrive (inventura.txt)</button>
         <button class="download" id="btnPreuzmi" type="button">💾 Preuzmi lokalno na telefon (TXT)</button>
         <button class="delete" id="btnObrisi" type="button">🗑️ Obriši sve sa telefona</button>
         
@@ -195,16 +195,19 @@ html
             try {
                 await navigator.share({
                     files: [fajl],
-                    title: "Inventura",
-                    text: "Fajl inventure (inventura.txt)"
+                    title: "Inventura"
                 });
-            } catch (e) {}
+            } catch (err) {
+                console.log("Slanje otkazano:", err);
+            }
         } else {
-            alert("Vaš pretraživač ne podržava direktno dijeljenje fajla, kliknite na zeleno dugme za preuzimanje.");
+            alert("Ovaj pregledač ne podržava direktno slanje. Fajl će biti preuzet na telefon.");
+            document.getElementById("btnPreuzmi").click();
         }
     };
 
     document.getElementById("btnObrisi").onclick = () => {
+        if (artikli.length === 0) return;
         if (confirm("Da li ste sigurni da želite obrisati sve artikle sa telefona?")) {
             artikli = [];
             localStorage.removeItem("inventura_artikli");
