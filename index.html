@@ -25,7 +25,7 @@ html
 </head>
 <body>
 
-    <h2>📦 Mobilna Gioco***Savic Inventura 2026</h2>
+    <h2>📦 Mobilna Giocomm***Savic Inventura 2026</h2>
 
     <div class="box">
         <h3>1. Skeniranje / Unos</h3>
@@ -40,7 +40,7 @@ html
 
     <div class="box">
         <h3>2. Zadržani artikli na telefonu (<span id="ukupnoStavki">0</span>)</h3>
-        <button class="share" id="btnPodijeli" type="button">☁️ Pošalji na OneDrive (inventura.txt)</button>
+        <button class="share" id="btnPodijeli" type="button">☁️ Pošalji na OneDrive (inventura.csv)</button>
         <button class="download" id="btnPreuzmi" type="button">💾 Preuzmi lokalno na telefon (TXT)</button>
         <button class="delete" id="btnObrisi" type="button">🗑️ Obriši sve sa telefona</button>
         
@@ -189,25 +189,42 @@ html
     document.getElementById("btnPodijeli").onclick = async () => {
         let txt = napraviTekst();
         if (!txt) return alert("Lista je prazna!");
-        let fajl = new File([txt], "inventura.txt", { type: "text/plain" });
+
+        // 1. Pokušaj slanja kao .csv fajl (najbolje radi sa OneDrive na Androidu)
+        let fajl = new File([txt], "inventura.csv", { type: "text/csv" });
         
         if (navigator.canShare && navigator.canShare({ files: [fajl] })) {
             try {
                 await navigator.share({
                     files: [fajl],
-                    title: "Inventura"
+                    title: "Inventura",
+                    text: "Inventura 2026"
                 });
+                return;
             } catch (err) {
-                console.log("Slanje otkazano:", err);
+                if (err.name === "AbortError") return;
             }
-        } else {
-            alert("Ovaj pregledač ne podržava direktno slanje. Fajl će biti preuzet na telefon.");
-            document.getElementById("btnPreuzmi").click();
         }
+
+        // 2. Rezerva: dijeljenje kao tekst ako telefon blokira slanje fajlova
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: "Inventura",
+                    text: txt
+                });
+                return;
+            } catch (err) {
+                if (err.name === "AbortError") return;
+            }
+        }
+
+        // 3. Krajnja rezerva ako pregledač ne podržava dijeljenje
+        alert("Pregledač ne podržava direktno slanje. Fajl će biti preuzet lokalno.");
+        document.getElementById("btnPreuzmi").click();
     };
 
     document.getElementById("btnObrisi").onclick = () => {
-        if (artikli.length === 0) return;
         if (confirm("Da li ste sigurni da želite obrisati sve artikle sa telefona?")) {
             artikli = [];
             localStorage.removeItem("inventura_artikli");
