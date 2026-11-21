@@ -4,7 +4,7 @@ html
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inventura JS</title>
+    <title>Inventura JS v2</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 15px; background: #f4f4f9; color: #333; }
         h2 { text-align: center; }
@@ -25,7 +25,7 @@ html
 </head>
 <body>
 
-    <h2>📦 Mobilna Giocomm***Savic Inventura 2026</h2>
+    <h2>📦 Mobilna Gioco###Savic Inventura 2026</h2>
 
     <div class="box">
         <h3>1. Skeniranje / Unos</h3>
@@ -190,7 +190,6 @@ html
         let txt = napraviTekst();
         if (!txt) return alert("Lista je prazna!");
 
-        // 1. Pokušaj slanja kao .csv fajl (najbolje radi sa OneDrive na Androidu)
         let fajl = new File([txt], "inventura.csv", { type: "text/csv" });
         
         if (navigator.canShare && navigator.canShare({ files: [fajl] })) {
@@ -202,11 +201,13 @@ html
                 });
                 return;
             } catch (err) {
-                if (err.name === "AbortError") return;
+                if (err.name !== "AbortError") {
+                    alert("Greška pri slanju fajla: " + err.message);
+                }
+                return;
             }
         }
 
-        // 2. Rezerva: dijeljenje kao tekst ako telefon blokira slanje fajlova
         if (navigator.share) {
             try {
                 await navigator.share({
@@ -215,13 +216,14 @@ html
                 });
                 return;
             } catch (err) {
-                if (err.name === "AbortError") return;
+                if (err.name !== "AbortError") {
+                    alert("Greška pri slanju teksta: " + err.message);
+                }
+                return;
             }
         }
 
-        // 3. Krajnja rezerva ako pregledač ne podržava dijeljenje
-        alert("Pregledač ne podržava direktno slanje. Fajl će biti preuzet lokalno.");
-        document.getElementById("btnPreuzmi").click();
+        alert("Ovaj pregledač uopšte ne podržava opciju dijeljenja (navigator.share). Koristite zeleno dugme za preuzimanje.");
     };
 
     document.getElementById("btnObrisi").onclick = () => {
