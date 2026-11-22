@@ -25,7 +25,7 @@ html
 </head>
 <body>
 
-    <h2>📦 Mobilna Gioco***Savic Inventura 2026</h2>
+    <h2>📦 Mobilna Gioco*##Savic Inventura 2026</h2>
 
     <div class="box">
         <h3>1. Skeniranje / Unos</h3>
@@ -197,7 +197,18 @@ html
                 await navigator.share({
                     files: [fajl],
                     title: "Inventura",
-                    text: "Inventura 2026"
+ document.getElementById("btnPodijeli").onclick = async () => {
+        let txt = napraviTekst();
+        if (!txt) return alert("Lista je prazna!");
+
+        // Android ne dozvoljava dijeljenje .csv fajla, ali .txt prolazi i otvara OneDrive!
+        let fajl = new File([txt], "inventura.txt", { type: "text/plain" });
+        
+        if (navigator.canShare && navigator.canShare({ files: [fajl] })) {
+            try {
+                await navigator.share({
+                    files: [fajl],
+                    title: "Inventura 2026"
                 });
                 return;
             } catch (err) {
@@ -208,33 +219,13 @@ html
             }
         }
 
-        if (navigator.share) {
-            try {
-                await navigator.share({
-                    title: "Inventura",
-                    text: txt
-                });
-                return;
-            } catch (err) {
-                if (err.name !== "AbortError") {
-                    alert("Greška pri slanju teksta: " + err.message);
-                }
-                return;
-            }
-        }
-
-        alert("Ovaj pregledač ne podržava direktno slanje. Koristite zeleno dugme za preuzimanje CSV fajla.");
+        alert("Vaš pregledač ne podržava slanje fajlova. Kliknite zeleno dugme za preuzimanje.");
     };
+Будите опрезни када користите кôд.
+(I na dugmetu gore u HTML-u promeni tekst iz inventura.csv u inventura.txt da znaš šta šalješ — sadržaj unutra ostaje identičan: sifra;kolicina.)
 
-    document.getElementById("btnObrisi").onclick = () => {
-        if (confirm("Da li ste sigurni da želite obrisati sve artikle sa telefona?")) {
-            artikli = [];
-            localStorage.removeItem("inventura_artikli");
-            prikazi();
-        }
-    };
+A ako želiš da bude .csv na laptopu bez ikakvog kliktanja menija na telefonu:
 
-    prikazi();
-</script>
-</body>
-</html>
+Pošto ti je fajl sa ovim kodom već na OneDrive-u (npr. u folderu OneDrive\Inventura\inventura.txt), na laptopu u istom tom folderu možeš jednom zauvek napraviti mali fajl pretvori_u_csv.bat (običan Notepad fajl) u koji upišeš samo jednu liniju:
+bat
+copy /Y inventura.txt inventura.csv
