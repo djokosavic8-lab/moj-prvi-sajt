@@ -25,7 +25,7 @@ html
 </head>
 <body>
 
-    <h2>📦 Mobilna Gioco*##Savic Inventura 2026</h2>
+    <h2>📦 Mobilna Gioco$$@@Savic Inventura 2026</h2>
 
     <div class="box">
         <h3>1. Skeniranje / Unos</h3>
@@ -192,12 +192,7 @@ html
 
         let fajl = new File([txt], "inventura.csv", { type: "text/csv" });
         
-        if (navigator.canShare && navigator.canShare({ files: [fajl] })) {
-            try {
-                await navigator.share({
-                    files: [fajl],
-                    title: "Inventura",
- document.getElementById("btnPodijeli").onclick = async () => {
+document.getElementById("btnPodijeli").onclick = async () => {
         let txt = napraviTekst();
         if (!txt) return alert("Lista je prazna!");
 
@@ -221,11 +216,3 @@ html
 
         alert("Vaš pregledač ne podržava slanje fajlova. Kliknite zeleno dugme za preuzimanje.");
     };
-Будите опрезни када користите кôд.
-(I na dugmetu gore u HTML-u promeni tekst iz inventura.csv u inventura.txt da znaš šta šalješ — sadržaj unutra ostaje identičan: sifra;kolicina.)
-
-A ako želiš da bude .csv na laptopu bez ikakvog kliktanja menija na telefonu:
-
-Pošto ti je fajl sa ovim kodom već na OneDrive-u (npr. u folderu OneDrive\Inventura\inventura.txt), na laptopu u istom tom folderu možeš jednom zauvek napraviti mali fajl pretvori_u_csv.bat (običan Notepad fajl) u koji upišeš samo jednu liniju:
-bat
-copy /Y inventura.txt inventura.csv
