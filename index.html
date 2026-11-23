@@ -4,10 +4,7 @@ html
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inventura 2026</title>
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="theme-color" content="#007bff">
-    <link rel="manifest" href='data:application/manifest+json,{"name":"Inventura 2026","short_name":"Inventura","start_url":"https://github.io","display":"standalone","background_color":"#f4f4f9","theme_color":"#007bff","icons":[{"src":"https://flaticon.com","sizes":"512x512","type":"image/png"}]}'>
+    <title>Inventura JS</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 15px; background: #f4f4f9; color: #333; }
         h2 { text-align: center; }
@@ -28,7 +25,7 @@ html
 </head>
 <body>
 
-    <h2>📦 Mobilna zarez.DjokoSavic57 Inventura 2026</h2>
+    <h2>📦 Mobilna 11Gioco$$@@Savic Inventura 2026</h2>
 
     <div class="box">
         <h3>1. Skeniranje / Unos</h3>
@@ -70,7 +67,7 @@ html
         statusDiv.style.display = "none";
 
         if (!window.isSecureContext) {
-            poruka("<b>BLOKIRANO:</b> Sajt mora biti otvoren preko <b>https://</b> adrese.");
+            poruka("<b>BLOKIRANO:</b> Sajt mora biti otvoren preko <b>https://</b> adrese (ne može direktno iz memorije telefona).");
             return;
         }
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -121,7 +118,7 @@ html
 
     function citajBarkod() {
         if (!("BarcodeDetector" in window)) {
-            poruka("Kamera radi, ali ovaj pregledač/telefon nema ugrađen čitač bar-kodova.");
+            poruka("Kamera radi, ali ovaj pregledač/telefon nema ugrađen čitač bar-kodova (potrebna je eksterna biblioteka poput ZXing ili html5-qrcode).");
             return;
         }
         const detector = new BarcodeDetector();
@@ -167,6 +164,7 @@ html
         localStorage.setItem("inventura_artikli", JSON.stringify(artikli));
         prikazi();
     }
+
     function prikazi() {
         let tb = document.getElementById("tabelaArtikala");
         document.getElementById("ukupnoStavki").innerText = artikli.length;
@@ -177,7 +175,7 @@ html
     }
 
     function napraviTekst() {
-        return artikli.map(a => `${a.sifra},${a.kolicina}`).join("\r\n");
+        return artikli.map(a => `${a.sifra};${a.kolicina}`).join("\r\n");
     }
 
     document.getElementById("btnDodaj").onclick = dodajArtikal;
