@@ -28,7 +28,7 @@ html
 </head>
 <body>
 
-    <h2>📦 Mobilna DjokoSavic57 Inventura 2026</h2>
+    <h2>📦 Mobilna zarez.DjokoSavic57 Inventura 2026</h2>
 
     <div class="box">
         <h3>1. Skeniranje / Unos</h3>
@@ -167,7 +167,6 @@ html
         localStorage.setItem("inventura_artikli", JSON.stringify(artikli));
         prikazi();
     }
-
     function prikazi() {
         let tb = document.getElementById("tabelaArtikala");
         document.getElementById("ukupnoStavki").innerText = artikli.length;
@@ -178,7 +177,7 @@ html
     }
 
     function napraviTekst() {
-        return artikli.map(a => `${a.sifra};${a.kolicina}`).join("\r\n");
+        return artikli.map(a => `${a.sifra},${a.kolicina}`).join("\r\n");
     }
 
     document.getElementById("btnDodaj").onclick = dodajArtikal;
